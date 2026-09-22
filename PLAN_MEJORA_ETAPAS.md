@@ -117,10 +117,10 @@ pospuesta.
   ver sus propios docstrings) — moverla habría roto esa dependencia real.
   `.gitignore` propio creado (antes heredaba del raíz). Verificado: los 17
   tests siguen pasando desde el repo nuevo.
-- ⏸ **Sin resolver el "riesgo crítico" de la auditoría original** (nota de
-  transparencia): el nuevo repo no tiene remoto en GitHub todavía — el
-  dueño va a crear el repo vacío en github.com y pasar la URL para el push.
-  Hasta que eso pase, el respaldo remoto sigue pendiente.
+- ✅ **Respaldo remoto resuelto (2026-09-22):** repo privado creado por el
+  dueño en `github.com/ogodinez-tucalzadola/AsistenteComprasProduccion`,
+  `git push -u origin main` exitoso. El "riesgo crítico" de la auditoría
+  original (11,134 líneas sin ningún respaldo versionado) queda cerrado.
 - ⏸ Separar los otros 12 proyectos del monorepo (GestionTUC,
   AsistenteComprasTEC, etc.) en repos independientes y limpiar los ~900
   archivos sucios ajenos: **fuera de alcance** — el dueño acotó esta tarea
