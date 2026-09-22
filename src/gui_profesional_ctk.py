@@ -9465,27 +9465,31 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         marco_grado.pack(side="right", padx=14)
 
         # El SCORE es ahora el número principal del badge (2026-09-09, pedido
-        # del usuario), en escala 1-100 y en letra grande. `score_final` ya
-        # viene en 0-100 desde `servidor_pty.py` (`score_base = 100 × sim_norm`,
-        # luego multiplicado por factores ≤ 1), así que NO se reescala nada:
-        # solo se redondea a entero y se acota al 1 mínimo para que un
-        # candidato calificado nunca muestre un "0" que parecería "sin
-        # calificar". La letra S/A/B/C/D se conserva debajo, chiquita: sigue
-        # siendo el lenguaje con el que se habla del corte de compra.
+        # del usuario), y en letra grande. `score_final` ya viene calculado
+        # (`score_base` 0-100 × varios factores acotados, ver
+        # `motor_calificacion.py`), así que NO se reescala nada: solo se
+        # redondea a entero y se acota al 1 mínimo para que un candidato
+        # calificado nunca muestre un "0" que parecería "sin calificar". La
+        # letra S/A/B/C/D se conserva debajo, chiquita: sigue siendo el
+        # lenguaje con el que se habla del corte de compra.
         #
-        # Por qué también se acota ARRIBA en 100: la fórmula multiplica
-        # `score_base` (0-100) por factores que en algún caso pasan de 1
-        # (`margen_factor`, `factor_mercado`), así que un candidato excepcional
-        # puede dar 105. La escala que se le prometió al comprador es 1-100 y
-        # el orden de la lista no cambia por el techo; el número exacto sin
-        # acotar sigue estando en «¿por qué? ↑» (desglose del score).
+        # CORREGIDO 2026-09-22: antes también se acotaba ARRIBA en 100 ("la
+        # escala que se le prometió al comprador es 1-100"), asumiendo que la
+        # fórmula rara vez pasaría de ~105. Medido contra lotes reales:
+        # varios factores (f_demanda, f_venta, f_rotacion, f_descuento)
+        # llegan a su tope a la vez con más frecuencia de la esperada, y el
+        # score real de un lote entero puede ir de 157 a 192 -- con el techo
+        # en 100, TODOS esos candidatos se veían idénticos ("100"), perdiendo
+        # justo la diferencia que el comprador necesita para elegir la mejor
+        # referencia. Mostrar el número real no cambia el orden ni la
+        # fórmula, solo deja de esconder la diferencia real entre candidatos.
         if score is not None:
-            numero = max(1, min(100, int(round(float(score)))))
+            numero = max(1, int(round(float(score))))
             etq_grado = tk.Label(marco_grado, text=str(numero), fg=solido(fg), bg=solido(bg),
                     font=("Segoe UI Semibold", 34), padx=18, pady=6, cursor="hand2")
             etq_grado.pack()
             leyenda = (f"promedio de {len(cand.get('colores_vista') or [])} colores  ·  grado {texto_grado}"
-                       if es_ponderado else f"score de 100  ·  grado {texto_grado}")
+                       if es_ponderado else f"score  ·  grado {texto_grado}")
             Etiqueta(marco_grado, text=leyenda, style="Suave.TLabel").pack()
         else:
             etq_grado = tk.Label(marco_grado, text=texto_grado, fg=solido(fg), bg=solido(bg),
@@ -9847,7 +9851,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             score_col = col.get("score_final")
             if score_col is not None:
                 grado_col = col.get("grado") or "—"
-                Etiqueta(chip, text=f"{max(1, min(100, int(round(float(score_col)))))} ({grado_col})",
+                Etiqueta(chip, text=f"{max(1, int(round(float(score_col))))} ({grado_col})",
                          style="Suave.TLabel").pack(pady=(2, 0))
             else:
                 falta = col.get("grado")
@@ -9885,7 +9889,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             final.pack(side="left")
             Etiqueta(final, text="Ponderado", style="Suave.TLabel").pack()
             grado_pond = cand.get("grado_ponderado") or "—"
-            Etiqueta(final, text=f"{max(1, min(100, int(round(float(score_pond)))))} ({grado_pond})",
+            Etiqueta(final, text=f"{max(1, int(round(float(score_pond))))} ({grado_pond})",
                      style="Subtitulo.TLabel").pack()
 
     def _ver_foto_color(self, path, titulo: str) -> None:
