@@ -881,6 +881,37 @@ def _badge(texto: str, ok: bool | None) -> tuple[str, str, str]:
     return texto, COLOR_NEUTRO, COLOR_FONDO
 
 
+def _centrar_en_ventana_principal(padre, ventana, ancho: int, alto: int) -> None:
+    """Centra una ventana emergente (CTkToplevel) sobre `padre`, en el MISMO
+    monitor donde esté -- no siempre el monitor primario.
+
+    Bug real (2026-09-22): la mayoría de los CTkToplevel del archivo se
+    creaban con `ventana.geometry("WxH")`, sin posición -- Tk/Windows los
+    coloca por defecto en el monitor primario, así que si el usuario trabaja
+    con la app en un segundo monitor, cada ventana emergente "salta" al
+    primero. Los 2 lugares que sí calculaban una posición relativa a `padre`
+    (`self.winfo_x()`/`winfo_y()`) además hacían `max(x,0)`/`max(y,0)`, que
+    fuerza la ventana de vuelta al monitor primario cuando el segundo monitor
+    está a la izquierda (coordenadas negativas) -- mismo bug por otro camino.
+
+    `winfo_rootx()`/`winfo_rooty()` (no `winfo_x()`/`winfo_y()`) funcionan
+    tanto si `padre` es la ventana raíz como si es un Frame embebido
+    (`VentanaCandidatosCTk`/`PanelComparablesCTk`), porque dan la posición en
+    pantalla, no relativa a un contenedor. El clamp usa el escritorio VIRTUAL
+    completo (`winfo_vrootx/y/width/height`, que en Windows con multi-monitor
+    incluye monitores con coordenadas negativas), no 0,0 -- así una ventana
+    nunca queda completamente fuera de pantalla, pero tampoco se fuerza al
+    monitor primario."""
+    padre.update_idletasks()
+    x = padre.winfo_rootx() + (padre.winfo_width() - ancho) // 2
+    y = padre.winfo_rooty() + (padre.winfo_height() - alto) // 2
+    vx, vy = padre.winfo_vrootx(), padre.winfo_vrooty()
+    vw, vh = padre.winfo_vrootwidth(), padre.winfo_vrootheight()
+    x = min(max(x, vx), vx + vw - ancho)
+    y = min(max(y, vy), vy + vh - alto)
+    ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+
 class HerramientaUnica(ctk.CTk):
     # ── carpeta del lote activo ──────────────────────────────────────────────
     #
@@ -2861,7 +2892,7 @@ class HerramientaUnica(ctk.CTk):
 
         ventana = ctk.CTkToplevel(self)
         ventana.title("Ajustes")
-        ventana.geometry("460x300")
+        _centrar_en_ventana_principal(self, ventana, 460, 300)
         Etiqueta(ventana, text="Método de comparación", style="Subtitulo.TLabel").pack(
             anchor="w", padx=14, pady=(14, 4))
         Etiqueta(ventana, text="Con qué espacio de vectores se buscan los comparables. "
@@ -3170,7 +3201,7 @@ class HerramientaUnica(ctk.CTk):
 
         espera = ctk.CTkToplevel(self)
         espera.title("Extrayendo…")
-        espera.geometry("520x230")
+        _centrar_en_ventana_principal(self, espera, 520, 230)
         espera.resizable(False, False)
         espera.configure(fg_color=PAR_PANEL)
         espera.transient(self)
@@ -3242,10 +3273,7 @@ class HerramientaUnica(ctk.CTk):
                              command=lambda: pedir_corte(False))
         btn_cancelar.pack(side="right")
 
-        self.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 520) // 2
-        y = self.winfo_y() + (self.winfo_height() - 230) // 2
-        espera.geometry(f"+{max(x,0)}+{max(y,0)}")
+        _centrar_en_ventana_principal(self, espera, 520, 230)
 
         resultado: dict = {}
 
@@ -3331,9 +3359,7 @@ class HerramientaUnica(ctk.CTk):
         Boton(fila_botones, text="Cerrar", style="Primario.TButton",
               command=aviso.destroy).pack(side="right")
         aviso.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - aviso.winfo_width()) // 2
-        y = self.winfo_y() + (self.winfo_height() - aviso.winfo_height()) // 2
-        aviso.geometry(f"+{max(x,0)}+{max(y,0)}")
+        _centrar_en_ventana_principal(self, aviso, aviso.winfo_width(), aviso.winfo_height())
 
         if resumen["total_imagenes"] == 0:
             return
@@ -4004,7 +4030,7 @@ class HerramientaUnica(ctk.CTk):
         v_canal = tk.StringVar(value="")
         ventana = ctk.CTkToplevel(self)
         ventana.title("Canal de venta de esta compra")
-        ventana.geometry("520x280")
+        _centrar_en_ventana_principal(self, ventana, 520, 280)
         ventana.resizable(False, False)
         Etiqueta(ventana, text="¿Esta compra es para TC Marcas o para TU Calzado?",
                  style="Subtitulo.TLabel").pack(anchor="w", padx=16, pady=(16, 4))
@@ -4081,7 +4107,7 @@ class HerramientaUnica(ctk.CTk):
 
         ventana = ctk.CTkToplevel(self)
         ventana.title("Mes de venta esperado")
-        ventana.geometry("500x250")
+        _centrar_en_ventana_principal(self, ventana, 500, 250)
         ventana.resizable(False, False)
 
         Etiqueta(ventana, text="¿Para qué mes esperás vender este pedido?",
@@ -4167,7 +4193,7 @@ class HerramientaUnica(ctk.CTk):
 
         ventana = ctk.CTkToplevel(self)
         ventana.title("Moneda del proveedor")
-        ventana.geometry("480x340")
+        _centrar_en_ventana_principal(self, ventana, 480, 340)
         ventana.resizable(False, False)
 
         titulo = ("¿En qué moneda está el costo de este proveedor?" if not nombre_prov
@@ -4543,8 +4569,7 @@ class HerramientaUnica(ctk.CTk):
         a preguntar porque había confusión."""
         ventana = ctk.CTkToplevel(self)
         ventana.title("¿Retomar o nuevo?")
-        ventana.geometry("420x200")
-
+        _centrar_en_ventana_principal(self, ventana, 420, 200)
         Etiqueta(ventana, text="Última carga sin terminar",
                 style="Subtitulo.TLabel").pack(anchor="w", padx=14, pady=(14, 4))
 
@@ -4609,7 +4634,7 @@ class HerramientaUnica(ctk.CTk):
         ventana = ctk.CTkToplevel(self)
         ventana.title("¿Qué querés hacer?")
         alto = min(560, 180 + 64 * max(1, len(proyectos)))
-        ventana.geometry(f"460x{alto}")
+        _centrar_en_ventana_principal(self, ventana, 460, alto)
 
         Etiqueta(ventana, text="¿Qué querés hacer?",
                 style="Subtitulo.TLabel").pack(anchor="w", padx=14, pady=(14, 4))
@@ -4716,8 +4741,7 @@ class HerramientaUnica(ctk.CTk):
 
         ventana = ctk.CTkToplevel(self)
         ventana.title("Nombre del proyecto")
-        ventana.geometry("420x200")
-
+        _centrar_en_ventana_principal(self, ventana, 420, 200)
         def _cerrar_programa() -> None:
             ventana.destroy()
             self.destroy()
@@ -5841,7 +5865,7 @@ class HerramientaUnica(ctk.CTk):
         "OTROS - Especificar nuevo" al final."""
         ventana = ctk.CTkToplevel(self)
         ventana.title("Elegí el proveedor")
-        ventana.geometry("360x480")
+        _centrar_en_ventana_principal(self, ventana, 360, 480)
         Etiqueta(ventana, text="¿De qué proveedor es este catálogo?",
                 style="Subtitulo.TLabel").pack(anchor="w", padx=14, pady=(14, 6))
         lista = tk.Listbox(ventana, activestyle="none")
@@ -5893,8 +5917,7 @@ class HerramientaUnica(ctk.CTk):
         Si el usuario cancela o hay error, retorna None."""
         ventana = ctk.CTkToplevel(self)
         ventana.title("Nuevo proveedor")
-        ventana.geometry("380x180")
-
+        _centrar_en_ventana_principal(self, ventana, 380, 180)
         Etiqueta(ventana, text="Nombre del nuevo proveedor",
                 style="Subtitulo.TLabel").pack(anchor="w", padx=14, pady=(14, 4))
         Etiqueta(ventana, text="Escribí el nombre exacto del proveedor tal como lo vas a usar.",
@@ -6201,6 +6224,8 @@ class HerramientaUnica(ctk.CTk):
         # `_traer_al_frente` (topmost ON/OFF diferido) es el patrón que ya se usa
         # en el resto del archivo para exactamente este problema de apilamiento
         # en Windows, y corre después de que el clic terminó de propagarse.
+        ventana.update_idletasks()
+        _centrar_en_ventana_principal(self, ventana, ventana.winfo_width(), ventana.winfo_height())
         _traer_al_frente(ventana)
 
     @staticmethod
@@ -7962,6 +7987,8 @@ class HerramientaUnica(ctk.CTk):
         Boton(fila_botones2, text="Cerrar", command=ventana.destroy).pack(side="right")
 
         refrescar_vista()
+        ventana.update_idletasks()
+        _centrar_en_ventana_principal(self, ventana, ventana.winfo_width(), ventana.winfo_height())
         # Mismo problema de apilamiento que `_mostrar_imagen_flotante` (ver la
         # nota larga allá): esta ventana también nace por un clic en una
         # miniatura del paso 5 y quedaba detrás de la principal maximizada.
@@ -9890,6 +9917,8 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         lbl.pack(padx=10, pady=(10, 4))
         Etiqueta(ventana, text=f"{titulo}  ·  {im.width} × {im.height} px",
                  style="Suave.TLabel").pack(pady=(0, 10))
+        ventana.update_idletasks()
+        _centrar_en_ventana_principal(self, ventana, ventana.winfo_width(), ventana.winfo_height())
         _traer_al_frente(ventana)
 
     def _confirmar_eliminar_variante(self, cand: dict, variante_id: int) -> None:
@@ -10060,8 +10089,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         ventana = ctk.CTkToplevel(self)
         ventana.title(f"¿Por qué {d['clasificacion']}? — "
                       f"{codigo_visible(cand.get('codigo_proveedor')) or cand['candidato_id']}")
-        ventana.geometry("620x520")
-
+        _centrar_en_ventana_principal(self, ventana, 620, 520)
         Etiqueta(ventana, text=d["frase"], style="Suave.TLabel", justify="left",
                 wraplength=580).pack(anchor="w", padx=16, pady=(14, 4), fill="x")
         Etiqueta(ventana,
@@ -10139,7 +10167,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         win.title(f"Comparables — {codigo}")
         # Generosa a propósito: acá entran DOS listas de comparables con foto
         # (marca reconocida y TUCALZADO vendido) más el cuadro de cotización.
-        win.geometry("1040x800")
+        _centrar_en_ventana_principal(self, win, 1040, 800)
         win.minsize(720, 520)
         win.resizable(True, True)
         win.protocol("WM_DELETE_WINDOW", self._cerrar_comparables)
@@ -10582,7 +10610,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         archivo a ciegas."""
         ventana = ctk.CTkToplevel(self)
         ventana.title("Sugerido de compra exportado")
-        ventana.geometry("620x220")
+        _centrar_en_ventana_principal(self, ventana, 620, 220)
         Etiqueta(ventana, text="✓ Sugerido de compra exportado",
                  style="Titulo.TLabel").pack(anchor="w", padx=18, pady=(16, 6))
         Etiqueta(ventana, text=str(destino), style="Suave.TLabel",
@@ -10833,6 +10861,8 @@ class PanelComparablesCTk(ctk.CTkFrame):
         lbl.pack(padx=10, pady=(10, 4))
         Etiqueta(ventana, text=f"{titulo}  ·  {im.width} × {im.height} px",
                  style="Suave.TLabel").pack(pady=(0, 10))
+        ventana.update_idletasks()
+        _centrar_en_ventana_principal(self, ventana, ventana.winfo_width(), ventana.winfo_height())
         _traer_al_frente(ventana)
 
     def _construir_panel_precio(self) -> None:
