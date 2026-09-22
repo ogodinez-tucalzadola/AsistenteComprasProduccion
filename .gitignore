@@ -1,0 +1,35 @@
+# ══════════════════════════════════════════════════════════════════
+#  AsistenteComprasProduccion — .gitignore
+#  Git rastrea CÓDIGO. Los datos y archivos generados se excluyen.
+# ══════════════════════════════════════════════════════════════════
+
+# ── Entornos Python / caché ────────────────────────────────────────
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# ── IDEs ──────────────────────────────────────────────────────────
+**/.vscode/
+**/.idea/
+
+# ── Estado runtime por máquina (no es código, difiere por equipo) ──
+src/_ultima_carpeta.json
+src/config_asistente_compras.json
+
+# ── Copias congeladas / migración archivada (referencia histórica) ─
+_archivo_migracion_2026-09/
+
+# ── Accesos directos de Windows ─────────────────────────────────────
+*.lnk
+
+# ── Datos de trabajo reales (lote.sqlite por carpeta + imágenes de
+#    proveedores, ~108 MB) -- NUNCA versionar: son datos de negocio, no
+#    código. Ver AUDITORIA_2026-09-22.md, hallazgo C2/C3.
+#    Vive en C:\Users\Tucalzado\Proyectos\AsistenteComprasLotes\, fuera de
+#    esta carpeta -- entrada mantenida por si algún día se anida adentro.
+AsistenteComprasLotes/
+
+# ── pytest ────────────────────────────────────────────────────────
+.pytest_cache/

@@ -1,0 +1,25 @@
+# Dependencias reales de AsistenteComprasProduccion/src, congeladas desde el
+# entorno que corre la app (Zawa/.venv) el 2026-09-22 -- plan de mejora,
+# Etapa 4 (red de seguridad). No existía ningún archivo de dependencias antes
+# de este commit.
+#
+# Nota: la app usa el intérprete de Zawa/.venv (proyecto hermano, entorno de
+# visión compartido), no un venv propio -- este archivo documenta qué
+# necesita reconstruir REALMENTE si ese entorno se pierde, no un venv nuevo
+# aislado. Instalar con:
+#   pip install -r requirements.txt
+
+numpy==2.5.2
+psycopg2-binary==2.9.12
+opencv-python-headless==5.0.0.93
+pillow==12.3.0
+openpyxl==3.1.5
+scipy==1.18.0
+psutil==7.2.2
+customtkinter==6.0.0
+darkdetect==0.8.0
+extract-msg==0.56.1
+pymupdf==1.28.2
+
+# Solo para tests (Etapa 4):
+pytest==9.1.1
