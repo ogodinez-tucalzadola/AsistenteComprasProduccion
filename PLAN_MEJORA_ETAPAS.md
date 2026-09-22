@@ -99,16 +99,34 @@ de historial de git no tiene sentido (la contraseña filtrada seguiría siendo
 válida), así que **la purga de historial queda descartada también**, no solo
 pospuesta.
 
-### 7.2 — Separar el monorepo: **CERRADO parcialmente (2026-09-22)**
+### 7.2 — Separar el monorepo: **CERRADO para este proyecto (2026-09-22)**
 - ✅ DBeaver vendorizado (1,001 de 1,752 archivos versionados, 159 MB) sacado
   del control de versiones con `git rm -r --cached DBeaver` + entrada en
   `.gitignore` (commit `b67b9a8`). Los binarios siguen en disco intactos —
   solo dejan de rastrearse hacia adelante. No purga el historial (ver 7.1:
   descartado).
-- ⏸ Separar los 13 proyectos en repos independientes y limpiar los ~900
-  archivos sucios ajenos: no iniciado, es un proyecto propio (mover historia,
-  actualizar rutas de importación entre proyectos que hoy comparten el mismo
-  árbol) — requiere sesión dedicada.
+- ✅ **`AsistenteComprasProduccion` ya tiene su propio repo git**, separado
+  del monorepo de 13 proyectos. `git rm -r --cached AsistenteComprasProduccion`
+  + entrada en `.gitignore` del monorepo raíz (commit `547aa65`), y `git init`
+  dentro de esta misma carpeta con un commit inicial que arranca del estado
+  actual (33 archivos, sin conservar el historial del monorepo — decisión
+  explícita del dueño, evita arrastrar commits viejos con la contraseña de
+  Postgres expuesta). La carpeta **no se movió de lugar**, a propósito:
+  `motor_calificacion.py`/`motor_candidatos.py` importan módulos de
+  `GestionTUC/pipeline` por ruta absoluta (OCR de catálogos de proveedor,
+  ver sus propios docstrings) — moverla habría roto esa dependencia real.
+  `.gitignore` propio creado (antes heredaba del raíz). Verificado: los 17
+  tests siguen pasando desde el repo nuevo.
+- ⏸ **Sin resolver el "riesgo crítico" de la auditoría original** (nota de
+  transparencia): el nuevo repo no tiene remoto en GitHub todavía — el
+  dueño va a crear el repo vacío en github.com y pasar la URL para el push.
+  Hasta que eso pase, el respaldo remoto sigue pendiente.
+- ⏸ Separar los otros 12 proyectos del monorepo (GestionTUC,
+  AsistenteComprasTEC, etc.) en repos independientes y limpiar los ~900
+  archivos sucios ajenos: **fuera de alcance** — el dueño acotó esta tarea
+  explícitamente a solo `AsistenteComprasProduccion` (el resto del monorepo,
+  incluido el módulo PTY de GestionTUC, no es el proyecto activo). No se
+  retoma por iniciativa propia.
 
 ### 7.3 — Gemelo `servidor_pty.py`: reescritura completa, **plan de migración documentado, NO ejecutado**
 

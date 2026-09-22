@@ -22,7 +22,9 @@ También hay credenciales de **superusuario** (`postgres/postgres123`) hardcodea
 
 Riesgo real: Postgres solo escucha en `127.0.0.1`, pero el secreto ya salió de la máquina. Cualquiera con acceso de lectura al repo (colaborador presente o futuro, token filtrado, cambio accidental a público) obtiene ambas contraseñas. Cambiar el archivo hoy no borra el historial — sigue en los 106 commits.
 
-**C2. Todo `AsistenteComprasProduccion` y `GestionTUC` viven en un monorepo de 13 proyectos, con 900 archivos sucios.**
+**Seguimiento (2026-09-22, mismo día — Etapa 7.2 del plan de mejora): `AsistenteComprasProduccion` ya no vive en ese monorepo.** Tiene su propio repo git independiente, iniciado desde el estado actual (sin conservar el historial de 106 commits del monorepo — así que la exposición de contraseña descrita en C1 arriba NO se arrastró a este repo nuevo; sigue existiendo en el historial del monorepo original, que no se tocó). `GestionTUC` sigue en el monorepo — el dueño acotó esta tarea a solo este proyecto.
+
+**C2. Todo `AsistenteComprasProduccion` y `GestionTUC` viven en un monorepo de 13 proyectos, con 900 archivos sucios.** *(hallazgo original, ver seguimiento arriba)*
 
 - `git status --short` desde `AsistenteComprasProduccion` lista 900 archivos modificados, de los cuales solo 2 son de este proyecto. Los otros 898 son de otros 6 proyectos ajenos.
 - El `.git` pesa 130 MB con solo 106 commits, porque tiene una instalación completa de DBeaver versionada: 1,001 de los 1,752 archivos del repo (57%) son de ese programa de terceros.
