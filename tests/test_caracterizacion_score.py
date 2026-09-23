@@ -9,6 +9,16 @@ Objetivo: dejar un punto de referencia verificable de que "un cambio no
 alteró los puntajes" (o si los alteró, que fue a propósito) -- exactamente
 lo que el plan de mejora pide antes de tocar rendimiento (Etapa 5).
 
+CORREGIDO 2026-09-23 (auditoría, Paso 1 del plan de paridad): hasta acá
+este archivo SOLO probaba el canal "marca" (`Prueba2`) -- el canal "tuc"
+nunca corrió contra un lote real en ningún test, aunque fue el canal donde
+se hizo el refactor grande de la Etapa C (`_puntuar_candidatos_impl`). El
+dueño del proyecto reclamó -- con razón, más de una vez -- que TUC y TC
+Marcas reciben tratamiento distinto en este proyecto cuando no hay ninguna
+razón técnica real para eso. Los dos tests de acá abajo ahora corren
+PARAMETRIZADOS contra un lote de cada canal: si alguno de los dos deja de
+tener red de seguridad, se nota en la lista de tests, no en un comentario.
+
 Correr con:
     Zawa\\.venv\\Scripts\\python.exe -m pytest AsistenteComprasProduccion/tests -v
 """
@@ -20,7 +30,22 @@ import pytest
 SRC_DIR = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(SRC_DIR))
 
-LOTE_PRUEBA = Path(r"C:\Users\Tucalzado\Proyectos\AsistenteComprasLotes\Prueba2")
+# Un lote real de cada canal -- mismo criterio, misma cantidad de rigor.
+# `modelo_activo` es el que ese lote realmente tiene vectorizado (marca:
+# fashion_siglip+dino_v2, "estandar"; tuc: dinov2_ti, "ti" -- el default
+# real de la app, ver motor_candidatos.MODELO_ACTIVO_DEFAULT).
+LOTES_PRUEBA = [
+    pytest.param(
+        Path(r"C:\Users\Tucalzado\Proyectos\AsistenteComprasLotes\Prueba2"),
+        "marca", "estandar",
+        id="marca-Prueba2",
+    ),
+    pytest.param(
+        Path(r"C:\Users\Tucalzado\Proyectos\AsistenteComprasLotes\Packing List 134"),
+        "tuc", "ti",
+        id="tuc-PackingList134",
+    ),
+]
 
 
 def _conexion_postgres_disponible():
@@ -34,24 +59,30 @@ def _conexion_postgres_disponible():
         return False
 
 
-requiere_entorno_real = pytest.mark.skipif(
-    not (LOTE_PRUEBA.exists() and _conexion_postgres_disponible()),
-    reason="requiere Postgres local + el lote de prueba Prueba2 en disco -- no disponible en este entorno",
-)
+@pytest.mark.parametrize("lote, canal_esperado, modelo_activo", LOTES_PRUEBA)
+def test_recalculo_normal_no_pierde_ningun_score(lote, canal_esperado, modelo_activo, request):
+    """Caracterización básica: recalcular un lote completo debe dejar TODOS
+    los candidatos con score_final numérico, en CUALQUIERA de los dos
+    canales. Si esto empieza a fallar tras un cambio de rendimiento (Etapa
+    5) o de refactor (Etapa C), el cambio rompió algo, no es "más rápido
+    nomás"."""
+    if not (lote.exists() and _conexion_postgres_disponible()):
+        pytest.skip(f"requiere Postgres local + el lote {lote.name} en disco")
 
-
-@requiere_entorno_real
-def test_recalculo_normal_no_pierde_ningun_score():
-    """Caracterización básica: recalcular un lote completo (18 candidatos,
-    canal marca) debe dejar TODOS los candidatos con score_final numérico.
-    Si esto empieza a fallar tras un cambio de rendimiento (Etapa 5), el
-    cambio rompió algo, no es "más rápido nomás"."""
     import psycopg2
     import psycopg2.extras
     import motor_calificacion as mc
 
-    mc.fijar_lote(LOTE_PRUEBA)
+    mc.fijar_lote(lote)
     try:
+        # Guarda contra que alguien cambie el canal_venta del lote de prueba
+        # sin darse cuenta y crea que sigue probando el canal que dice el id
+        # del test -- eso volvería a dejar un canal sin red real en silencio.
+        canal_real = mc.canal_venta_lote()
+        assert canal_real == canal_esperado, (
+            f"el lote {lote.name} declara canal_venta={canal_real!r}, se esperaba "
+            f"{canal_esperado!r} -- ¿se cambió el lote de prueba sin actualizar este test?")
+
         pg = psycopg2.connect(host="127.0.0.1", port=5432, dbname="tcmarcas",
                                user="tcm_etl", password="tcmarcas2025!",
                                options="-c search_path=staging,bronze,silver,gold,public")
@@ -61,7 +92,7 @@ def test_recalculo_normal_no_pierde_ningun_score():
             ids = [r[0] for r in cl.execute("SELECT candidato_id FROM candidato").fetchall()]
             assert ids, "el lote de prueba no tiene candidatos -- ¿se movió o se vació?"
 
-            mc.puntuar_candidatos(cur, ids, modelo_activo="estandar")
+            mc.puntuar_candidatos(cur, ids, modelo_activo=modelo_activo)
 
             cl2 = mc._cl()
             filas = cl2.execute(
@@ -80,19 +111,34 @@ def test_recalculo_normal_no_pierde_ningun_score():
         mc.cerrar_lote()
 
 
-@requiere_entorno_real
-def test_fallo_a_mitad_del_recalculo_no_borra_los_scores_previos():
+@pytest.mark.parametrize("lote, canal_esperado, modelo_activo", LOTES_PRUEBA)
+def test_fallo_a_mitad_del_recalculo_no_borra_los_scores_previos(lote, canal_esperado, modelo_activo):
     """Regresión directa del hallazgo de la Etapa 2: `puntuar_candidatos()`
     borraba todos los scores de un lote ANTES de recalcularlos, sin
     transacción -- una caída a mitad dejaba el lote sin ningún score. Este
     test simula esa caída forzando una excepción real a mitad del bucle y
-    confirma que los scores previos sobreviven intactos."""
+    confirma que los scores previos sobreviven intactos, en los DOS canales.
+
+    El punto de fallo se simula en `_guardar_score_variante`, no en
+    `_guardar_score_candidato` (como hacía la versión anterior de este
+    test): `_guardar_score_candidato` es un helper que solo usa el canal
+    marca -- el canal tuc arma su propio INSERT inline (ver
+    `_puntuar_candidatos_impl`). `_guardar_score_variante` sí es común a
+    los dos canales y corre en el mismo punto relativo del bucle en ambos,
+    así que es el único gancho que prueba lo mismo en los dos casos."""
+    if not (lote.exists() and _conexion_postgres_disponible()):
+        pytest.skip(f"requiere Postgres local + el lote {lote.name} en disco")
+
     import psycopg2
     import psycopg2.extras
     import motor_calificacion as mc
 
-    mc.fijar_lote(LOTE_PRUEBA)
+    mc.fijar_lote(lote)
     try:
+        canal_real = mc.canal_venta_lote()
+        assert canal_real == canal_esperado, (
+            f"el lote {lote.name} declara canal_venta={canal_real!r}, se esperaba {canal_esperado!r}")
+
         pg = psycopg2.connect(host="127.0.0.1", port=5432, dbname="tcmarcas",
                                user="tcm_etl", password="tcmarcas2025!",
                                options="-c search_path=staging,bronze,silver,gold,public")
@@ -103,15 +149,16 @@ def test_fallo_a_mitad_del_recalculo_no_borra_los_scores_previos():
             assert ids
 
             # Recalcular una vez de verdad para tener un estado "antes" real.
-            mc.puntuar_candidatos(cur, ids, modelo_activo="estandar")
+            mc.puntuar_candidatos(cur, ids, modelo_activo=modelo_activo)
             antes = {
                 r["candidato_id"]: r["score_final"]
                 for r in mc._cl().execute("SELECT candidato_id, score_final FROM candidato_score").fetchall()
             }
             assert all(v is not None for v in antes.values()), "precondición: todos con score antes de simular el fallo"
 
-            # Forzar una excepción real a mitad del bucle de guardado.
-            original = mc._guardar_score_candidato
+            # Forzar una excepción real a mitad del bucle de guardado por
+            # variante (común a los dos canales).
+            original = mc._guardar_score_variante
             contador = {"n": 0}
 
             def falla_a_mitad(*args, **kwargs):
@@ -120,12 +167,12 @@ def test_fallo_a_mitad_del_recalculo_no_borra_los_scores_previos():
                     raise RuntimeError("fallo simulado -- se cae Postgres a mitad de camino")
                 return original(*args, **kwargs)
 
-            mc._guardar_score_candidato = falla_a_mitad
+            mc._guardar_score_variante = falla_a_mitad
             try:
                 with pytest.raises(RuntimeError):
-                    mc.puntuar_candidatos(cur, ids, modelo_activo="estandar")
+                    mc.puntuar_candidatos(cur, ids, modelo_activo=modelo_activo)
             finally:
-                mc._guardar_score_candidato = original
+                mc._guardar_score_variante = original
 
             despues = {
                 r["candidato_id"]: r["score_final"]
