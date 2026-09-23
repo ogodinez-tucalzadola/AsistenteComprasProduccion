@@ -87,12 +87,14 @@ import decisiones
 import indice_fuente
 import nucleo
 import reparar
+import rutas_externas
 
 # Carpeta central donde vive cada corrida de lote, una subcarpeta por
 # proyecto (nombrada como el usuario lo bautiza en el diálogo inicial). Antes
 # cada lote se guardaba donde el usuario eligiera al vuelo (ej. mezclado con
 # las fotos de entrada), sin ningún lugar fijo para ver el historial completo.
-CARPETA_LOTES_CENTRAL = Path(r"C:\Users\Tucalzado\Proyectos\AsistenteComprasLotes")
+# Auditoría 2026-09-23 (M9): la ruta en sí vive centralizada en `rutas_externas.py`.
+CARPETA_LOTES_CENTRAL = rutas_externas.ASISTENTE_COMPRAS_LOTES
 
 try:
     import io as _io

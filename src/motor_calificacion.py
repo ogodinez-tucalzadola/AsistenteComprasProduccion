@@ -68,14 +68,16 @@ import psycopg2.extras
 # Postgres sino en el `lote.sqlite` de cada lote, cuyo dueño es `almacen.py`
 # (mismo módulo que ya administra las decisiones y reparaciones del lote).
 import almacen
+import rutas_externas
 
-PIPELINE_DIR = Path(r"C:\Users\Tucalzado\Proyectos\GestionTUC\pipeline")  # FASE 1: era
+PIPELINE_DIR = rutas_externas.GESTIONTUC_PIPELINE  # FASE 1: era
 # `Path(__file__).resolve().parent`. Este archivo ya NO vive en esa carpeta, pero el valor
 # debe seguir apuntando ahi para que el `sys.path.insert` de abajo siga encontrando
 # `ingestar_catalogo_tuc` (modulo aparte de GestionTUC que NO se copio: es del OCR de
-# catalogos, no del motor de calificacion).
+# catalogos, no del motor de calificacion). Auditoría 2026-09-23 (M9): la ruta en sí
+# vive centralizada en `rutas_externas.py`, no repetida acá.
 sys.path.insert(0, str(PIPELINE_DIR))
-sys.path.insert(0, str(Path(r"C:\Users\Tucalzado\Proyectos\AnálisisMercado\scripts")))
+sys.path.insert(0, str(rutas_externas.ANALISISMERCADO_SCRIPTS))
 
 # Auditoría 2026-09-23 (CI, Fase A): estos 3 imports dependen de carpetas
 # HERMANAS a este repo (GestionTUC, AnálisisMercado) que no existen fuera de
@@ -610,10 +612,10 @@ def enmascarar_texto_ocr(img, confianza_min=None):
 
 
 PORT = 8900
-WEB_DIR = Path(r"C:\Users\Tucalzado\Proyectos\GestionTUC\data")  # FASE 1: era
+WEB_DIR = rutas_externas.GESTIONTUC_DATA  # FASE 1: era
 # `Path(__file__).resolve().parent.parent / "data"`. Conserva el MISMO valor que tenia en
 # servidor_pty.py (solo lo usaba el Handler HTTP, que no se copio).
-DATOS_COMPARTIDOS = Path(r"C:\Users\Tucalzado\Proyectos\DatosCompartidos")
+DATOS_COMPARTIDOS = rutas_externas.DATOS_COMPARTIDOS
 CARPETA_CROPS = "tuc_catalogo_staging"
 DB_PARAMS = dict(host="127.0.0.1", port=5432, dbname="tcmarcas",
                   user="tcm_etl", password="tcmarcas2025!")

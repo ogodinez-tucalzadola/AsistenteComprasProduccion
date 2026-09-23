@@ -35,7 +35,9 @@ from pathlib import Path
 
 import psycopg2.extras
 
-_PIPELINE_DIR = Path(r"C:\Users\Tucalzado\Proyectos\GestionTUC\pipeline")
+import rutas_externas
+
+_PIPELINE_DIR = rutas_externas.GESTIONTUC_PIPELINE  # auditoría 2026-09-23 (M9): centralizada
 sys.path.insert(0, str(_PIPELINE_DIR))
 
 import motor_calificacion as _motor_calif_mod  # noqa: E402  -- para leer _vectorizador (¿ya cargado?)
