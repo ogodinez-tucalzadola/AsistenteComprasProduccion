@@ -2794,6 +2794,29 @@ def ancla_similitud(modelo_activo: str, dominio: str) -> float:
     raise ValueError(f"dominio desconocido: {dominio!r} (esperaba 'marca' o 'tuc')")
 
 
+def _factor_acotado(proxy: float, referencia: float, techo: float, pendiente: float) -> float:
+    """La forma compartida de f_demanda/f_rotacion/f_venta/f_descuento en
+    los DOS canales (tuc y marca) -- plan de paridad 2026-09-23, Paso 5.
+
+    Hasta acá esta misma expresión (`min(techo, max(0.85, 0.85 + pendiente *
+    (proxy / referencia)))`) estaba escrita 8 veces (4 factores × 2 canales),
+    idéntica salvo qué `REFERENCIA_*`/`techo`/`pendiente` le tocaba a cada
+    una -- exactamente el tipo de duplicación que el plan de paridad pidió
+    evaluar recién DESPUÉS de que los dos canales tuvieran la misma
+    protección de tests (Pasos 1-4), no antes. El piso (0.85) es el mismo en
+    los 8 casos, así que queda fijo -- no varía entre factores ni canales,
+    a diferencia de `referencia`, `techo` y `pendiente`, que sí son propios
+    de cada factor (no del canal: f_demanda/f_venta siempre usan techo=1.20/
+    pendiente=0.35, f_rotacion/f_descuento siempre 1.15/0.30, en los dos
+    canales por igual -- ver cada llamada).
+
+    Sin esta función, cambiar el piso compartido (0.85) requeriría editar 8
+    lugares y confiar en que ninguno se saltó -- ya pasó antes con las 2
+    fórmulas de f_rotacion (ver PLAN_MEJORA_ETAPAS.md:9, "cualquier cambio
+    a esa lógica tiene que tocar los dos sitios o quedan divergentes")."""
+    return min(techo, max(0.85, 0.85 + pendiente * (proxy / referencia)))
+
+
 REFERENCIA_DEMANDA = 17.4  # u/mes, media real de velocidad_mensual sobre el
 # índice kNN TUC (8,718 productos, gold.agg_tuc_metricas). "Tus similares
 # venden al ritmo del promedio del catálogo" -> f_demanda neutro-alto.
@@ -3957,7 +3980,7 @@ def _puntuar_variante_marca(idx, *, v, v_dino, cat_c, gen_c, categoria_conflicto
             t_validas = tendencias_top[con_venta]
             t_validas = np.where(np.isnan(t_validas), 1.0, t_validas)
             tendencia_proxy = float(np.sum(pesos[con_venta] * t_validas) / peso_con_venta)
-            f_demanda = min(1.20, max(0.85, 0.85 + 0.35 * (demanda_proxy / REFERENCIA_DEMANDA_MARCA)))
+            f_demanda = _factor_acotado(demanda_proxy, REFERENCIA_DEMANDA_MARCA, 1.20, 0.35)
 
     # f_rotacion / f_descuento / f_venta: mismo pedido explícito del dueño
     # que el canal genérico, y desde el plan de mejora 2026-09-22, con la
@@ -3970,9 +3993,9 @@ def _puntuar_variante_marca(idx, *, v, v_dino, cat_c, gen_c, categoria_conflicto
     rotacion_proxy = float(np.sum(pesos * idx["rot30"][top]))
     descuento_proxy = float(np.sum(pesos * idx["pct_sin_promo"][top]))
     venta_proxy = float(np.sum(pesos * idx["factor_venta"][top]))
-    f_rotacion = min(1.15, max(0.85, 0.85 + 0.30 * (rotacion_proxy / REFERENCIA_ROT30_MARCA)))
-    f_descuento = min(1.15, max(0.85, 0.85 + 0.30 * (descuento_proxy / REFERENCIA_PCT_SIN_PROMO_MARCA)))
-    f_venta = min(1.20, max(0.85, 0.85 + 0.35 * (venta_proxy / REFERENCIA_FACTOR_VENTA_MARCA)))
+    f_rotacion = _factor_acotado(rotacion_proxy, REFERENCIA_ROT30_MARCA, 1.15, 0.30)
+    f_descuento = _factor_acotado(descuento_proxy, REFERENCIA_PCT_SIN_PROMO_MARCA, 1.15, 0.30)
+    f_venta = _factor_acotado(venta_proxy, REFERENCIA_FACTOR_VENTA_MARCA, 1.20, 0.35)
 
     margen_factor = 1.0  # igual que el canal genérico: se recalcula al cotizar
     factor_mercado = factor_mercado_fn()
@@ -4529,7 +4552,7 @@ def _puntuar_variante_tuc(idx, *, v, v_dino, cat_c, gen_c, categoria_conflicto,
     # esto solo matiza el resultado que ya dio la similitud vectorial,
     # nunca lo reemplaza. REFERENCIA_DEMANDA es la media real fija del
     # catálogo TUC (17.4 u/mes), no un percentil recalculado.
-    f_demanda = min(1.20, max(0.85, 0.85 + 0.35 * (demanda_proxy / REFERENCIA_DEMANDA)))
+    f_demanda = _factor_acotado(demanda_proxy, REFERENCIA_DEMANDA, 1.20, 0.35)
 
     # f_rotacion / f_venta: plan 2026-09-21, pedido directo del dueño --
     # dos variables medidas que ya existían en la base (rot_mensual =
@@ -4539,15 +4562,15 @@ def _puntuar_variante_tuc(idx, *, v, v_dino, cat_c, gen_c, categoria_conflicto,
     # sobre la similitud vectorial. Sin dato para un vecino, ya se
     # imputó la referencia (al armar `rotaciones`/`factores_venta` en
     # `_indice_tuc_para_score`) -- ese vecino queda neutro, no penaliza.
-    f_rotacion = min(1.15, max(0.85, 0.85 + 0.30 * (rotacion_proxy / REFERENCIA_ROTACION)))
-    f_venta = min(1.20, max(0.85, 0.85 + 0.35 * (venta_proxy / REFERENCIA_FACTOR_VENTA)))
+    f_rotacion = _factor_acotado(rotacion_proxy, REFERENCIA_ROTACION, 1.15, 0.30)
+    f_venta = _factor_acotado(venta_proxy, REFERENCIA_FACTOR_VENTA, 1.20, 0.35)
 
     # f_descuento: plan 2026-09-21, mismo pedido -- precio_avg/precio_lista
     # ("Artículos por precio" del Power BI, silver.fct_tuc_precio) es el
     # proxy objetivo de "ventas sin descuento" que faltaba (ver
     # REFERENCIA_PCT_SOBRE_LISTA). Mismo patrón: factor acotado, ancla a
     # la mediana real, nunca domina sobre la similitud vectorial.
-    f_descuento = min(1.15, max(0.85, 0.85 + 0.30 * (descuento_proxy / REFERENCIA_PCT_SOBRE_LISTA)))
+    f_descuento = _factor_acotado(descuento_proxy, REFERENCIA_PCT_SOBRE_LISTA, 1.15, 0.30)
 
     # Paso 7 del plan 2026-09-04: factor de importación/tendencia real
     # (aduana) por tipo+marca declarados -- 1.0 si no hay dato declarado
