@@ -64,6 +64,7 @@ if sys.stdout is None or sys.stderr is None:
 
 import contextlib
 import json
+import logging
 import os
 import queue
 import re
@@ -88,6 +89,38 @@ import indice_fuente
 import nucleo
 import reparar
 import rutas_externas
+
+# Auditoría 2026-09-23, Fase B (M3): antes de esto, la interfaz (11,000+
+# líneas, 155 bloques `except`) no dejaba NINGÚN rastro cuando algo fallaba
+# -- ni siquiera un print(), porque además (ver arriba) esta app corre sin
+# consola. `motor_calificacion.py` ya tiene su propio logger a
+# `<lote>/motor.log`, pero importarlo acá forzaría a cargar todo el motor de
+# visión (torch/transformers) en CADA arranque de la GUI, incluso para
+# pasos que nunca tocan scoring -- por eso la interfaz nunca lo importa a
+# nivel de módulo (mismo patrón ya existente: `import motor_calificacion`
+# siempre local, dentro de la función que lo necesita). Este logger es
+# liviano (solo `logging` de la librería estándar) y va a un archivo por
+# día, no por lote -- muchos fallos posibles (el diálogo inicial, elegir
+# proveedor) ocurren ANTES de que exista un lote activo.
+_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+_log_gui = logging.getLogger("gui_profesional_ctk")
+_log_gui.setLevel(logging.INFO)
+
+
+def _logger_gui() -> logging.Logger:
+    if not _log_gui.handlers:
+        try:
+            _LOG_DIR.mkdir(exist_ok=True)
+            archivo = _LOG_DIR / f"gui_{datetime.now():%Y-%m-%d}.log"
+            handler = logging.FileHandler(archivo, encoding="utf-8")
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            _log_gui.addHandler(handler)
+        except OSError:
+            # No poder loguear no puede tumbar la app -- se queda sin
+            # handler (los .exception()/.error() no revientan sin handler,
+            # simplemente no escriben a ningún lado).
+            pass
+    return _log_gui
 
 # Carpeta central donde vive cada corrida de lote, una subcarpeta por
 # proyecto (nombrada como el usuario lo bautiza en el diálogo inicial). Antes
