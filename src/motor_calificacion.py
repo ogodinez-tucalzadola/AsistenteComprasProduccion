@@ -4098,6 +4098,415 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
             modelo_activo=modelo_activo, dominio="marca")
 
 
+def _indice_tuc_para_score(cur, modelo_activo: str):
+    """El índice del canal TU Calzado: el catálogo TUC ya vendido (dominio
+    'tuc') con su vector, sus métricas de venta y sus atributos.
+
+    Es el gemelo de `_indice_marca_para_score` para el otro canal, extraído de
+    `_puntuar_candidatos_impl` (que lo armaba inline) sin cambiar una sola
+    operación: mismas dos consultas, mismos `or 0` / `or 1.0`, mismas
+    constantes de imputación (REFERENCIA_ROTACION / REFERENCIA_FACTOR_VENTA /
+    REFERENCIA_PCT_SOBRE_LISTA) y el mismo orden de normalización L2. El
+    requisito del dueño es que el número de este canal NO se mueva, así que
+    esto es una mudanza literal, no una reescritura.
+
+    A diferencia del canal marca, acá velocidades/tendencias SÍ caen a 0/1.0
+    cuando faltan: el índice son productos PROPIOS ya vendidos, donde "sin
+    fila de métricas" sí significa que no se movió, no "no hay registro".
+
+    Devuelve None si el índice está vacío (mismo criterio que la de marca);
+    el llamador corta ahí sin escribir nada."""
+    if modelo_activo == "ti":
+        query = """
+            SELECT t.vector, m.velocidad_mensual, m.tendencia_3m, m.rot_mensual, m.factor_venta,
+                   m.pct_sobre_lista,
+                   p.categoria, g.genero_canonico,
+                   t.codigo_tuc, p.precio_mediano, a.color_familia, a.material_norm
+            FROM silver.fct_embedding_ti_codigo t
+            JOIN gold.agg_tuc_metricas m ON m.codigo_tuc = t.codigo_tuc
+            JOIN silver.dim_tuc_producto p ON p.codigo_tuc = t.codigo_tuc
+            LEFT JOIN cfg.lkp_tuc_genero g ON g.genero_crudo = p.genero
+            LEFT JOIN bronze.raw_tuc_atributos a ON a.codigo = t.codigo_tuc
+            WHERE t.modelo = 'dinov2_ti'
+        """
+        # Cursor servidor + numpy por lote -- ver `_consumir_por_lotes` (plan
+        # de mejora 2026-09-22 Etapa 5, medido: 617MB -> 258MB de pico).
+        # `resto` guarda SOLO metadata (f[1:]), nunca el vector -- si también
+        # se guardara la fila completa, el vector quedaría duplicado (una vez
+        # en la lista Python cruda, otra vez en el numpy de `trozos_vec`) y
+        # se perdería el ahorro de memoria que motiva este cambio.
+        trozos_vec, resto = [], []
+        for lote in _consumir_por_lotes(cur, query):
+            trozos_vec.append(np.array([f[0] for f in lote], dtype=np.float32))
+            resto.extend(f[1:] for f in lote)
+        if not resto:
+            return None
+        filas = resto
+        indice = np.concatenate(trozos_vec, axis=0)
+        indice_dino = None
+    else:
+        query = """
+            SELECT s.vector, d.vector, m.velocidad_mensual, m.tendencia_3m, m.rot_mensual, m.factor_venta,
+                   m.pct_sobre_lista,
+                   p.categoria, g.genero_canonico,
+                   s.codigo_tuc, p.precio_mediano, a.color_familia, a.material_norm
+            FROM silver.fct_embedding_imagen s
+            JOIN silver.fct_embedding_imagen d ON d.imagen_id = s.imagen_id AND d.modelo_embedding = 'dino_v2'
+            JOIN gold.agg_tuc_metricas m ON m.codigo_tuc = s.codigo_tuc
+            JOIN silver.dim_tuc_producto p ON p.codigo_tuc = s.codigo_tuc
+            LEFT JOIN cfg.lkp_tuc_genero g ON g.genero_crudo = p.genero
+            LEFT JOIN bronze.raw_tuc_atributos a ON a.codigo = s.codigo_tuc
+            WHERE s.modelo_embedding = 'fashion_siglip' AND s.dominio = 'tuc'
+        """
+        # "dino": el índice es la columna dino_v2 (f[1]); "fashion" se queda
+        # con fashion_siglip (f[0]), que es lo que ya traía. En los dos casos
+        # `indice_dino` queda en None: no hay fusión que ponderar.
+        columna_vector = 1 if modelo_activo == "dino" else 0
+        necesita_dino = modelo_activo not in MODELO_UNICO
+        # Cursor servidor + numpy por lote -- ver `_consumir_por_lotes` (plan
+        # de mejora 2026-09-22 Etapa 5, medido: 617MB -> 258MB de pico).
+        # `resto` guarda SOLO metadata (f[2:]), nunca los vectores -- ver la
+        # nota equivalente en la rama "ti" de arriba.
+        trozos_vec, trozos_dino, resto = [], [], []
+        for lote in _consumir_por_lotes(cur, query):
+            trozos_vec.append(np.array([f[columna_vector] for f in lote], dtype=np.float32))
+            if necesita_dino:
+                trozos_dino.append(np.array([f[1] for f in lote], dtype=np.float32))
+            resto.extend(f[2:] for f in lote)
+        if not resto:
+            return None
+        filas = resto
+        indice = np.concatenate(trozos_vec, axis=0)
+        if not necesita_dino:
+            indice_dino = None
+        else:
+            indice_dino = np.concatenate(trozos_dino, axis=0)
+            normas = np.linalg.norm(indice_dino, axis=1, keepdims=True); normas[normas == 0] = 1.0
+            indice_dino /= normas
+
+    velocidades = np.array([float(f[0] or 0) for f in filas])
+    tendencias = np.array([float(f[1] or 1.0) for f in filas])
+    rotaciones = np.array([float(f[2]) if f[2] is not None else REFERENCIA_ROTACION for f in filas])
+    factores_venta = np.array([float(f[3]) if f[3] is not None else REFERENCIA_FACTOR_VENTA for f in filas])
+    pcts_sobre_lista = np.array([float(f[4]) if f[4] is not None else REFERENCIA_PCT_SOBRE_LISTA for f in filas])
+    categorias_idx = np.array([f[5] for f in filas], dtype=object)
+    generos_idx = np.array([f[6] for f in filas], dtype=object)
+    codigos_idx = np.array([f[7] for f in filas], dtype=object)
+    precios_idx = np.array([float(f[8]) if f[8] is not None else np.nan for f in filas])
+    colores_idx = np.array([f[9] for f in filas], dtype=object)
+    materiales_idx = np.array([f[10] for f in filas], dtype=object)
+
+    normas = np.linalg.norm(indice, axis=1, keepdims=True); normas[normas == 0] = 1.0
+    indice /= normas
+
+    return {
+        "n": len(filas),
+        "indice": indice,
+        "indice_dino": indice_dino,
+        "velocidades": velocidades,
+        "tendencias": tendencias,
+        "rotaciones": rotaciones,
+        "factores_venta": factores_venta,
+        "pcts_sobre_lista": pcts_sobre_lista,
+        "categorias": categorias_idx,
+        "generos": generos_idx,
+        "codigos": codigos_idx,
+        "precios": precios_idx,
+        "colores": colores_idx,
+        "materiales": materiales_idx,
+    }
+
+
+def _puntuar_variante_tuc(idx, *, v, v_dino, cat_c, gen_c, categoria_conflicto,
+                           color_candidato_familia, mapa_prevalencia,
+                           modelo_activo: str, k: int,
+                           precio_candidato_fn, factor_mercado_fn):
+    """La matemática de puntuar UNA variante (un color) contra el índice TUC:
+    filtro categoría/género, similitud, umbral de comparabilidad, respaldo por
+    precio, los 8 factores acotados y el score final.
+
+    No toca NINGUNA base (ni Postgres ni el `lote.sqlite`): recibe el índice ya
+    cargado y los datos del candidato, y devuelve un dict con todo lo que el
+    llamador va a guardar. Ese es el punto de haberla separado -- así se puede
+    probar con arreglos numpy inventados a mano, sin base montada, que es lo
+    único que el bucle original no permitía.
+
+    Los dos datos que sí vienen de una base llegan como FUNCIONES sin
+    argumentos (`precio_candidato_fn`, `factor_mercado_fn`) en vez de valores
+    ya calculados, y a propósito: en el bucle original esas dos consultas solo
+    corren cuando el camino llega hasta ellas (el respaldo por precio, solo si
+    no hubo comparables visuales; el factor de mercado, solo si hubo
+    comparables). Pasarlas ya evaluadas cambiaría cuántas consultas se
+    disparan; pasarlas como función deja ese comportamiento idéntico y a la
+    vez mantiene esta función libre de SQL. En un test se pasan como
+    `lambda: None` / `lambda: 1.0`.
+
+    Cuando no hay comparables devuelve el dict con `clasificacion =
+    "sin_comparables"` y el resto en None -- el llamador decide qué escribir,
+    acá no se escribe nada."""
+    indice = idx["indice"]
+    precios_idx = idx["precios"]
+
+    mascara = np.ones(idx["n"], dtype=bool)
+    if cat_c:
+        mascara &= (idx["categorias"] == cat_c)
+    if gen_c:
+        mascara &= (idx["generos"] == gen_c)
+    # Plan 2026-09-07, paso 2.3 (fórmula determinística): instrumenta el
+    # camino que REALMENTE corrió, no lo que se podría inferir de
+    # categoria_declarada/genero_canonico. Hallazgo del auditor: mirar
+    # solo categoria_declarada no detecta esta degradación -- un
+    # candidato CON categoría declarada puede terminar sin filtro igual
+    # si esa categoría+género no tiene ningún vecino real, y antes eso
+    # era invisible. `filtro_aplicado` se guarda en agg_candidato_score
+    # para que f_tipo (paso 2.4) lea el hecho real, no la columna.
+    if mascara.any():
+        filtro_aplicado = ("categoria+genero" if (cat_c and gen_c) else
+                            "solo_categoria" if cat_c else
+                            "solo_genero" if gen_c else "ninguno")
+    else:  # filtro demasiado estricto (ej. género raro sin vecinos) -> degradar sin filtro
+        mascara = np.ones(idx["n"], dtype=bool)
+        filtro_aplicado = "ninguno"
+
+    if modelo_activo in MODELO_UNICO:
+        sims = indice @ v
+    else:
+        sims = ALPHA_FUSION_SIGLIP * (indice @ v)
+        if v_dino is not None:
+            sims = sims + (1 - ALPHA_FUSION_SIGLIP) * (idx["indice_dino"] @ v_dino)
+    sims = np.where(mascara, sims, -np.inf)
+
+    # Auditoría Opus 2026-09-03, hallazgo real: `SIMILITUD_MINIMA_COMPARABLE`
+    # existía pero NUNCA se aplicaba acá -- la única máscara era categoría/
+    # género, así que un candidato podía salir "grado A" ponderado contra
+    # vecinos con 50% de similitud real. A diferencia del filtro de
+    # categoría/género (que si queda vacío SE DEGRADA sin filtro, porque un
+    # género raro sin vecinos es un caso legítimo), el umbral de similitud
+    # NO se degrada: si nadie lo pasa, es que de verdad no hay comparables,
+    # y un producto sin comparables debe quedar SIN GRADO, no con un score
+    # inventado sobre vecinos parecidos a medias.
+    # Umbral por modelo (paso 4 del plan 2026-09-04) -- 0.75 se calibró para
+    # la fusión SigLIP+DINOv2 y NO es válido para el espacio DINOv2 puro de
+    # TI (otra distribución de coseno); ver UMBRAL_POR_MODELO.
+    # Dominio 'tuc' explícito: este camino busca contra el catálogo genérico
+    # y su umbral NO cambia (sigue siendo el ya calibrado y verificado).
+    umbral_dominio = umbral_comparable(modelo_activo, "tuc")
+    mascara_comparable = mascara & (sims >= umbral_dominio)
+
+    metodo_score = "visual"
+    if not mascara_comparable.any():
+        # Paso 8 del plan 2026-09-04: sin nada visualmente comparable, se
+        # intenta un respaldo por PRECIO -- un producto de precio parecido,
+        # dentro de la misma categoría/género, es una segunda forma
+        # razonable de estimar demanda-proxy, pedida explícitamente por el
+        # usuario para que ningún candidato quede sin score.
+        precio_candidato = precio_candidato_fn()
+        if precio_candidato:
+            precios_validos = ~np.isnan(precios_idx) & mascara
+            if precios_validos.any():
+                dif_rel = np.abs(precios_idx - precio_candidato) / precio_candidato
+                mascara_precio = precios_validos & (dif_rel <= TOLERANCIA_PRECIO)
+                if mascara_precio.any():
+                    # 1.0 = precio idéntico, 0 justo en el borde de la tolerancia --
+                    # mismo rol que `sims` para el resto del cálculo (top-k, pesos).
+                    sims = np.where(mascara_precio, 1 - (dif_rel / TOLERANCIA_PRECIO), -np.inf)
+                    mascara_comparable = mascara_precio
+                    metodo_score = "precio"
+
+    if not mascara_comparable.any():
+        return {"clasificacion": "sin_comparables", "filtro_aplicado": filtro_aplicado,
+                "metodo_score": None, "n_vecinos": 0, "score_final": None,
+                "sim_ponderada": None, "vecinos_detalle": None}
+
+    kk = min(k, int(mascara_comparable.sum()))
+    sims = np.where(mascara_comparable, sims, -np.inf)
+    top = np.argsort(-sims, kind="stable")[:kk]
+    # Paso 5 del plan 2026-09-04: antes se ponderaba por la similitud CRUDA
+    # (`clip(sims,0)`), y como `top` ya viene filtrado por el umbral, TODOS
+    # los vecinos aquí tienen similitud >= umbral -- un vecino apenas sobre
+    # el corte (ej. 0.66 con umbral 0.65) pesaba casi lo mismo, en términos
+    # relativos, que uno con match casi perfecto (0.95). Restar el umbral
+    # antes de ponderar hace que un vecino "apenas comparable" pese casi
+    # nada de verdad, no solo nominalmente menos.
+    # El respaldo por precio ya construyó `sims` en su propia escala
+    # (0 = borde de la tolerancia, 1 = precio idéntico) -- no tiene
+    # sentido restarle el umbral de similitud VISUAL, que vive en otra
+    # escala (coseno).
+    umbral_activo = umbral_dominio if metodo_score == "visual" else 0.0
+    pesos = np.clip(sims[top] - umbral_activo, 0, None)
+    pesos = pesos / pesos.sum() if pesos.sum() > 0 else np.ones(kk) / kk
+    demanda_proxy = float(np.sum(pesos * idx["velocidades"][top]))
+    tendencia_proxy = float(np.sum(pesos * idx["tendencias"][top]))
+    rotacion_proxy = float(np.sum(pesos * idx["rotaciones"][top]))
+    venta_proxy = float(np.sum(pesos * idx["factores_venta"][top]))
+    descuento_proxy = float(np.sum(pesos * idx["pcts_sobre_lista"][top]))
+    margen_factor = 1.0  # candidato en staging aún no tiene cotización -- se recalcula tras promover
+
+    # ============================================================
+    # Plan 2026-09-07, paso 2.4: fórmula determinística. La comparación
+    # vectorial es el TÉRMINO PRINCIPAL (score_base, spread medido 9.2x);
+    # tipo/color/atributos/demanda son AJUSTES acotados cerca de 1.0 que
+    # nunca pueden dominarla -- requisito explícito del usuario. Todo lo
+    # que entra acá es (a) un atributo propio del candidato/sus vecinos,
+    # o (b) una constante fija de módulo/tabla congelada -- NADA depende
+    # de qué más exista en staging_tuc ni del estado del catálogo TUC en
+    # el momento de puntuar (mismo candidato -> mismo score, siempre).
+    sim_pond = float(np.sum(pesos * sims[top]))
+    # El respaldo por precio (metodo_score="precio") ya deja sims en una
+    # escala propia [0,1] (0=borde de tolerancia, 1=precio idéntico) --
+    # no es una similitud coseno, así que usa su propio umbral/ancla
+    # (0/1) en vez de UMBRAL_POR_MODELO/ANCLA_SIMILITUD.
+    if metodo_score == "visual":
+        # Dominio 'tuc' explícito (mismo valor de siempre: este canal no
+        # cambia). Ver `ancla_similitud`.
+        umbral_sim = umbral_dominio
+        ancla_sim = ancla_similitud(modelo_activo, "tuc")
+    else:
+        umbral_sim, ancla_sim = 0.0, 1.0
+    sim_norm = min(1.0, max(0.0, (sim_pond - umbral_sim) / (ancla_sim - umbral_sim)))
+    score_base = 100.0 * sim_norm
+
+    # f_soporte: cuánta evidencia real hay detrás del match -- k_efectivo
+    # (inverso de Herfindahl de los pesos) distingue "7 vecinos genuinos"
+    # de "7 vecinos donde 1 solo se lleva todo el peso", cosa que un
+    # conteo simple de vecinos no ve.
+    k_efectivo = float(1.0 / np.sum(pesos ** 2))
+    f_soporte = 0.70 + 0.30 * min(1.0, k_efectivo / K_SOPORTE_PLENO)
+
+    # f_tipo: lee filtro_aplicado (paso 2.3, el camino que REALMENTE
+    # corrió), no categoria_declarada -- detecta también la degradación
+    # invisible de la línea de "mascara.any()" de más arriba.
+    f_tipo = (1.00 if filtro_aplicado == "categoria+genero" else
+              0.92 if filtro_aplicado in ("solo_categoria", "solo_genero") else
+              0.85)
+    # Paso 2.5: cierra el vector de gaming "declarar una categoría que no
+    # corresponde a la foto real" -- si el clasificador visual
+    # (categorizar_candidatos) contradice lo que el proveedor declaró,
+    # se aplica el mismo tope que un filtro parcial, sin importar que el
+    # filtro haya corrido completo (categoria+genero ya no basta para
+    # confiar en la categoría si la propia foto la contradice).
+    if categoria_conflicto:
+        f_tipo = min(f_tipo, 0.92)
+
+    # f_color: lift sobre la prevalencia FIJA de ese color en esa
+    # categoría (cfg.prevalencia_color_categoria, paso 2.2) -- un negro
+    # entre negros no es la misma señal en Botas y botines (50% del
+    # catálogo) que en Deportivos (37%). Neutro (1.00) si el candidato no
+    # tiene color mapeado, si no hay categoría de referencia para buscar
+    # la prevalencia, o si menos de 3 vecinos del top tienen color
+    # poblado (evidencia insuficiente para una fracción confiable).
+    f_color = 1.00
+    colores_top = idx["colores"][top]
+    con_color = colores_top != None  # noqa: E711 -- np.object_ None real, no NaN
+    if color_candidato_familia and cat_c and con_color.sum() >= 3:
+        peso_con_color = float(np.sum(pesos[con_color]))
+        if peso_con_color > 0:
+            peso_mismo_color = float(np.sum(pesos[con_color & (colores_top == color_candidato_familia)]))
+            frac_obs = peso_mismo_color / peso_con_color
+            prevalencia = mapa_prevalencia.get((cat_c, color_candidato_familia))
+            if prevalencia and prevalencia > 0:
+                lift = frac_obs / prevalencia
+                f_color = min(1.10, max(0.90, 0.90 + 0.10 * min(2.0, lift)))
+
+    # f_atrib: homogeneidad de material_norm ENTRE los vecinos -- señal
+    # de CONFIANZA (¿los vecinos concuerdan entre sí?), no de match
+    # candidato-vecino (el candidato no tiene material propio, solo se
+    # deriva de vectorización de vecinos). Neutro si <2 vecinos con
+    # material poblado (homogeneidad de 0-1 muestra no significa nada).
+    f_atrib = 1.00
+    materiales_top = idx["materiales"][top]
+    con_material = materiales_top != None  # noqa: E711
+    if con_material.sum() >= 2:
+        peso_con_material = float(np.sum(pesos[con_material]))
+        if peso_con_material > 0:
+            valores_material = materiales_top[con_material]
+            homogeneidad = max(
+                float(np.sum(pesos[con_material][valores_material == val])) / peso_con_material
+                for val in set(valores_material)
+            )
+            f_atrib = min(1.05, max(0.95, 0.98 + 0.04 * homogeneidad))
+
+    # f_demanda: SECUNDARIO -- el candidato nunca va a tener demanda
+    # propia (es un producto nuevo, la norma, no la excepción), así que
+    # esto solo matiza el resultado que ya dio la similitud vectorial,
+    # nunca lo reemplaza. REFERENCIA_DEMANDA es la media real fija del
+    # catálogo TUC (17.4 u/mes), no un percentil recalculado.
+    f_demanda = min(1.20, max(0.85, 0.85 + 0.35 * (demanda_proxy / REFERENCIA_DEMANDA)))
+
+    # f_rotacion / f_venta: plan 2026-09-21, pedido directo del dueño --
+    # dos variables medidas que ya existían en la base (rot_mensual =
+    # % Rotación real del Power BI; factor_venta = "Factor venta" del
+    # Excel de rotación) pero nunca llegaban al score. Mismo patrón que
+    # f_demanda: factor acotado, ancla a una mediana real, nunca domina
+    # sobre la similitud vectorial. Sin dato para un vecino, ya se
+    # imputó la referencia (al armar `rotaciones`/`factores_venta` en
+    # `_indice_tuc_para_score`) -- ese vecino queda neutro, no penaliza.
+    f_rotacion = min(1.15, max(0.85, 0.85 + 0.30 * (rotacion_proxy / REFERENCIA_ROTACION)))
+    f_venta = min(1.20, max(0.85, 0.85 + 0.35 * (venta_proxy / REFERENCIA_FACTOR_VENTA)))
+
+    # f_descuento: plan 2026-09-21, mismo pedido -- precio_avg/precio_lista
+    # ("Artículos por precio" del Power BI, silver.fct_tuc_precio) es el
+    # proxy objetivo de "ventas sin descuento" que faltaba (ver
+    # REFERENCIA_PCT_SOBRE_LISTA). Mismo patrón: factor acotado, ancla a
+    # la mediana real, nunca domina sobre la similitud vectorial.
+    f_descuento = min(1.15, max(0.85, 0.85 + 0.30 * (descuento_proxy / REFERENCIA_PCT_SOBRE_LISTA)))
+
+    # Paso 7 del plan 2026-09-04: factor de importación/tendencia real
+    # (aduana) por tipo+marca declarados -- 1.0 si no hay dato declarado
+    # (siempre el caso para GestionTUC/PTY, que no puebla esas columnas).
+    # Se mantiene sin cambios (no es parte de las 8 fallas auditadas del
+    # paso 2.4) -- documentado como inerte en este flujo, no removido.
+    factor_mercado = factor_mercado_fn()
+
+    score_final = round(score_base * f_soporte * f_tipo * f_color * f_atrib
+                         * f_demanda * f_rotacion * f_venta * f_descuento
+                         * margen_factor * factor_mercado, 4)
+    clasificacion = ("S" if score_final >= CORTES_CLASIFICACION["S"] else
+                      "A" if score_final >= CORTES_CLASIFICACION["A"] else
+                      "B" if score_final >= CORTES_CLASIFICACION["B"] else
+                      "C" if score_final >= CORTES_CLASIFICACION["C"] else "D")
+
+    # Paso 2 del plan 2026-09-04: sin esto no había forma de auditar POR QUÉ
+    # un candidato salió "S" o "D" -- antes solo se guardaba `n_vecinos` (un
+    # número). Ordenado por peso descendente para que el primero de la
+    # lista sea el que más influyó en el score.
+    orden_peso = np.argsort(-pesos)
+    codigos_idx = idx["codigos"]
+    vecinos_detalle = [
+        {"codigo_tuc": str(codigos_idx[top[j]]),
+         "similitud": round(float(sims[top[j]]), 4),
+         "peso": round(float(pesos[j]), 4),
+         "metodo": metodo_score}
+        for j in orden_peso
+    ]
+
+    return {
+        "score_final": score_final,
+        "clasificacion": clasificacion,
+        "n_vecinos": kk,
+        "sim_ponderada": sim_pond,
+        "k_efectivo": k_efectivo,
+        "f_soporte": f_soporte,
+        "f_tipo": f_tipo,
+        "f_color": f_color,
+        "f_atrib": f_atrib,
+        "f_demanda": f_demanda,
+        "f_rotacion": f_rotacion,
+        "rotacion_proxy": rotacion_proxy,
+        "f_venta": f_venta,
+        "venta_proxy": venta_proxy,
+        "f_descuento": f_descuento,
+        "descuento_proxy": descuento_proxy,
+        "factor_mercado": factor_mercado,
+        "filtro_aplicado": filtro_aplicado,
+        "vecinos_detalle": vecinos_detalle,
+        "demanda_proxy": demanda_proxy,
+        "tendencia_proxy": tendencia_proxy,
+        "margen_factor": margen_factor,
+        "metodo_score": metodo_score,
+    }
+
+
 def puntuar_candidatos(cur, candidato_ids, k=7, modelo_activo: str = "estandar"):
     """Envoltorio transaccional de `_puntuar_candidatos_impl` (que a su vez
     puede derivar a `_puntuar_candidatos_marca_impl`) -- plan de mejora
@@ -4140,7 +4549,15 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
     Marcas (`lote_meta.canal_venta = 'marca'`), el puntaje se calcula contra el
     dominio 'marca' -- ver `_puntuar_candidatos_marca`. Si es para TU Calzado
     (o si el lote no lo declaró), corre el camino de siempre contra el dominio
-    'tuc', sin un solo cambio respecto de antes de esta bifurcación."""
+    'tuc', sin un solo cambio respecto de antes de esta bifurcación.
+
+    Esta función es el ORQUESTADOR del canal 'tuc': carga el índice
+    (`_indice_tuc_para_score`), recorre candidatos y colores leyendo del
+    `lote.sqlite` lo propio de cada uno, delega el cálculo en
+    `_puntuar_variante_tuc` (matemática pura, sin SQL) y guarda el resultado.
+    Ese reparto es de FORMA, no de fondo: el orden de las operaciones y las
+    constantes son los mismos de antes, porque el requisito del dueño citado
+    arriba ("sin un solo cambio") sigue vigente."""
     if canal_venta_lote() == "marca":
         _puntuar_candidatos_marca_impl(cur, candidato_ids, k=k, modelo_activo=modelo_activo)
         return
@@ -4156,97 +4573,12 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
     cur.execute("SELECT categoria, color_familia, prevalencia FROM cfg.prevalencia_color_categoria")
     mapa_prevalencia = {(cat, col): float(prev) for cat, col, prev in cur.fetchall()}
 
-    if modelo_activo == "ti":
-        query = """
-            SELECT t.vector, m.velocidad_mensual, m.tendencia_3m, m.rot_mensual, m.factor_venta,
-                   m.pct_sobre_lista,
-                   p.categoria, g.genero_canonico,
-                   t.codigo_tuc, p.precio_mediano, a.color_familia, a.material_norm
-            FROM silver.fct_embedding_ti_codigo t
-            JOIN gold.agg_tuc_metricas m ON m.codigo_tuc = t.codigo_tuc
-            JOIN silver.dim_tuc_producto p ON p.codigo_tuc = t.codigo_tuc
-            LEFT JOIN cfg.lkp_tuc_genero g ON g.genero_crudo = p.genero
-            LEFT JOIN bronze.raw_tuc_atributos a ON a.codigo = t.codigo_tuc
-            WHERE t.modelo = 'dinov2_ti'
-        """
-        # Cursor servidor + numpy por lote -- ver `_consumir_por_lotes` (plan
-        # de mejora 2026-09-22 Etapa 5, medido: 617MB -> 258MB de pico).
-        # `resto` guarda SOLO metadata (f[1:]), nunca el vector -- si también
-        # se guardara la fila completa, el vector quedaría duplicado (una vez
-        # en la lista Python cruda, otra vez en el numpy de `trozos_vec`) y
-        # se perdería el ahorro de memoria que motiva este cambio.
-        trozos_vec, resto = [], []
-        for lote in _consumir_por_lotes(cur, query):
-            trozos_vec.append(np.array([f[0] for f in lote], dtype=np.float32))
-            resto.extend(f[1:] for f in lote)
-        if not resto:
-            return
-        filas = resto
-        indice = np.concatenate(trozos_vec, axis=0)
-        indice_dino = None
-        velocidades = np.array([float(f[0] or 0) for f in filas])
-        tendencias = np.array([float(f[1] or 1.0) for f in filas])
-        rotaciones = np.array([float(f[2]) if f[2] is not None else REFERENCIA_ROTACION for f in filas])
-        factores_venta = np.array([float(f[3]) if f[3] is not None else REFERENCIA_FACTOR_VENTA for f in filas])
-        pcts_sobre_lista = np.array([float(f[4]) if f[4] is not None else REFERENCIA_PCT_SOBRE_LISTA for f in filas])
-        categorias_idx = np.array([f[5] for f in filas], dtype=object)
-        generos_idx = np.array([f[6] for f in filas], dtype=object)
-        codigos_idx = np.array([f[7] for f in filas], dtype=object)
-        precios_idx = np.array([float(f[8]) if f[8] is not None else np.nan for f in filas])
-        colores_idx = np.array([f[9] for f in filas], dtype=object)
-        materiales_idx = np.array([f[10] for f in filas], dtype=object)
-    else:
-        query = """
-            SELECT s.vector, d.vector, m.velocidad_mensual, m.tendencia_3m, m.rot_mensual, m.factor_venta,
-                   m.pct_sobre_lista,
-                   p.categoria, g.genero_canonico,
-                   s.codigo_tuc, p.precio_mediano, a.color_familia, a.material_norm
-            FROM silver.fct_embedding_imagen s
-            JOIN silver.fct_embedding_imagen d ON d.imagen_id = s.imagen_id AND d.modelo_embedding = 'dino_v2'
-            JOIN gold.agg_tuc_metricas m ON m.codigo_tuc = s.codigo_tuc
-            JOIN silver.dim_tuc_producto p ON p.codigo_tuc = s.codigo_tuc
-            LEFT JOIN cfg.lkp_tuc_genero g ON g.genero_crudo = p.genero
-            LEFT JOIN bronze.raw_tuc_atributos a ON a.codigo = s.codigo_tuc
-            WHERE s.modelo_embedding = 'fashion_siglip' AND s.dominio = 'tuc'
-        """
-        # "dino": el índice es la columna dino_v2 (f[1]); "fashion" se queda
-        # con fashion_siglip (f[0]), que es lo que ya traía. En los dos casos
-        # `indice_dino` queda en None: no hay fusión que ponderar.
-        columna_vector = 1 if modelo_activo == "dino" else 0
-        necesita_dino = modelo_activo not in MODELO_UNICO
-        # Cursor servidor + numpy por lote -- ver `_consumir_por_lotes` (plan
-        # de mejora 2026-09-22 Etapa 5, medido: 617MB -> 258MB de pico).
-        # `resto` guarda SOLO metadata (f[2:]), nunca los vectores -- ver la
-        # nota equivalente en la rama "ti" de arriba.
-        trozos_vec, trozos_dino, resto = [], [], []
-        for lote in _consumir_por_lotes(cur, query):
-            trozos_vec.append(np.array([f[columna_vector] for f in lote], dtype=np.float32))
-            if necesita_dino:
-                trozos_dino.append(np.array([f[1] for f in lote], dtype=np.float32))
-            resto.extend(f[2:] for f in lote)
-        if not resto:
-            return
-        filas = resto
-        indice = np.concatenate(trozos_vec, axis=0)
-        if not necesita_dino:
-            indice_dino = None
-        else:
-            indice_dino = np.concatenate(trozos_dino, axis=0)
-            normas = np.linalg.norm(indice_dino, axis=1, keepdims=True); normas[normas == 0] = 1.0
-            indice_dino /= normas
-        velocidades = np.array([float(f[0] or 0) for f in filas])
-        tendencias = np.array([float(f[1] or 1.0) for f in filas])
-        rotaciones = np.array([float(f[2]) if f[2] is not None else REFERENCIA_ROTACION for f in filas])
-        factores_venta = np.array([float(f[3]) if f[3] is not None else REFERENCIA_FACTOR_VENTA for f in filas])
-        pcts_sobre_lista = np.array([float(f[4]) if f[4] is not None else REFERENCIA_PCT_SOBRE_LISTA for f in filas])
-        categorias_idx = np.array([f[5] for f in filas], dtype=object)
-        generos_idx = np.array([f[6] for f in filas], dtype=object)
-        codigos_idx = np.array([f[7] for f in filas], dtype=object)
-        precios_idx = np.array([float(f[8]) if f[8] is not None else np.nan for f in filas])
-        colores_idx = np.array([f[9] for f in filas], dtype=object)
-        materiales_idx = np.array([f[10] for f in filas], dtype=object)
-    normas = np.linalg.norm(indice, axis=1, keepdims=True); normas[normas == 0] = 1.0
-    indice /= normas
+    # El índice del catálogo TUC se carga UNA sola vez por llamada (no por
+    # candidato) -- ver `_indice_tuc_para_score`. Índice vacío = no hay contra
+    # qué comparar: se corta antes de borrar o escribir nada.
+    idx = _indice_tuc_para_score(cur, modelo_activo)
+    if idx is None:
+        return
 
     # UN PUNTAJE POR COLOR (2026-09-17). Antes este bucle corría una vez por
     # candidato con el vector PROMEDIO de sus variantes; ahora corre una vez
@@ -4292,59 +4624,11 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
         color_candidato_familia = (mapa_color_candidato.get(color_variante)
                                    if color_variante else None)
 
-        mascara = np.ones(len(filas), dtype=bool)
-        if cat_c:
-            mascara &= (categorias_idx == cat_c)
-        if gen_c:
-            mascara &= (generos_idx == gen_c)
-        # Plan 2026-09-07, paso 2.3 (fórmula determinística): instrumenta el
-        # camino que REALMENTE corrió, no lo que se podría inferir de
-        # categoria_declarada/genero_canonico. Hallazgo del auditor: mirar
-        # solo categoria_declarada no detecta esta degradación -- un
-        # candidato CON categoría declarada puede terminar sin filtro igual
-        # si esa categoría+género no tiene ningún vecino real, y antes eso
-        # era invisible. `filtro_aplicado` se guarda en agg_candidato_score
-        # para que f_tipo (paso 2.4) lea el hecho real, no la columna.
-        if mascara.any():
-            filtro_aplicado = ("categoria+genero" if (cat_c and gen_c) else
-                                "solo_categoria" if cat_c else
-                                "solo_genero" if gen_c else "ninguno")
-        else:  # filtro demasiado estricto (ej. género raro sin vecinos) -> degradar sin filtro
-            mascara = np.ones(len(filas), dtype=bool)
-            filtro_aplicado = "ninguno"
-
-        if modelo_activo in MODELO_UNICO:
-            sims = indice @ v
-        else:
-            sims = ALPHA_FUSION_SIGLIP * (indice @ v)
-            if v_dino is not None:
-                sims = sims + (1 - ALPHA_FUSION_SIGLIP) * (indice_dino @ v_dino)
-        sims = np.where(mascara, sims, -np.inf)
-
-        # Auditoría Opus 2026-09-03, hallazgo real: `SIMILITUD_MINIMA_COMPARABLE`
-        # existía pero NUNCA se aplicaba acá -- la única máscara era categoría/
-        # género, así que un candidato podía salir "grado A" ponderado contra
-        # vecinos con 50% de similitud real. A diferencia del filtro de
-        # categoría/género (que si queda vacío SE DEGRADA sin filtro, porque un
-        # género raro sin vecinos es un caso legítimo), el umbral de similitud
-        # NO se degrada: si nadie lo pasa, es que de verdad no hay comparables,
-        # y un producto sin comparables debe quedar SIN GRADO, no con un score
-        # inventado sobre vecinos parecidos a medias.
-        # Umbral por modelo (paso 4 del plan 2026-09-04) -- 0.75 se calibró para
-        # la fusión SigLIP+DINOv2 y NO es válido para el espacio DINOv2 puro de
-        # TI (otra distribución de coseno); ver UMBRAL_POR_MODELO.
-        # Dominio 'tuc' explícito: este camino busca contra el catálogo genérico
-        # y su umbral NO cambia (sigue siendo el ya calibrado y verificado).
-        umbral_dominio = umbral_comparable(modelo_activo, "tuc")
-        mascara_comparable = mascara & (sims >= umbral_dominio)
-
-        metodo_score = "visual"
-        if not mascara_comparable.any():
-            # Paso 8 del plan 2026-09-04: sin nada visualmente comparable, se
-            # intenta un respaldo por PRECIO -- un producto de precio parecido,
-            # dentro de la misma categoría/género, es una segunda forma
-            # razonable de estimar demanda-proxy, pedida explícitamente por el
-            # usuario para que ningún candidato quede sin score.
+        # El cálculo en sí vive en `_puntuar_variante_tuc` (sin SQL adentro):
+        # las dos lecturas que ese camino necesita se le pasan como funciones
+        # para que sigan corriendo SOLO cuando el cálculo llega hasta ellas,
+        # igual que cuando todo esto era un solo bloque.
+        def _precio_candidato():
             cl.execute("""
                 SELECT r.costo, r.moneda_costo FROM candidato c
                 JOIN candidato_raw r
@@ -4353,20 +4637,20 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
                 WHERE c.candidato_id = ?
             """, (candidato_id,))
             fila_costo = cl.fetchone()
-            precio_candidato = _precio_venta_estimado(*tuple(fila_costo)) if fila_costo else None
-            if precio_candidato:
-                precios_validos = ~np.isnan(precios_idx) & mascara
-                if precios_validos.any():
-                    dif_rel = np.abs(precios_idx - precio_candidato) / precio_candidato
-                    mascara_precio = precios_validos & (dif_rel <= TOLERANCIA_PRECIO)
-                    if mascara_precio.any():
-                        # 1.0 = precio idéntico, 0 justo en el borde de la tolerancia --
-                        # mismo rol que `sims` para el resto del cálculo (top-k, pesos).
-                        sims = np.where(mascara_precio, 1 - (dif_rel / TOLERANCIA_PRECIO), -np.inf)
-                        mascara_comparable = mascara_precio
-                        metodo_score = "precio"
+            return _precio_venta_estimado(*tuple(fila_costo)) if fila_costo else None
 
-        if not mascara_comparable.any():
+        res = _puntuar_variante_tuc(
+            idx, v=v, v_dino=v_dino, cat_c=cat_c, gen_c=gen_c,
+            categoria_conflicto=categoria_conflicto,
+            color_candidato_familia=color_candidato_familia,
+            mapa_prevalencia=mapa_prevalencia,
+            modelo_activo=modelo_activo, k=k,
+            precio_candidato_fn=_precio_candidato,
+            factor_mercado_fn=lambda: _factor_mercado(cur, candidato_id),
+        )
+        filtro_aplicado = res["filtro_aplicado"]
+
+        if res["clasificacion"] == "sin_comparables":
             _guardar_score_variante(candidato_id, indice_variante, color_variante, None,
                                     "sin_comparables", 0, None, filtro_aplicado, None,
                                     modelo_activo=modelo_activo, dominio="tuc")
@@ -4400,170 +4684,10 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
             """, (candidato_id, filtro_aplicado, modelo_activo, almacen.ahora()))
             continue
 
-        kk = min(k, int(mascara_comparable.sum()))
-        sims = np.where(mascara_comparable, sims, -np.inf)
-        top = np.argsort(-sims, kind="stable")[:kk]
-        # Paso 5 del plan 2026-09-04: antes se ponderaba por la similitud CRUDA
-        # (`clip(sims,0)`), y como `top` ya viene filtrado por el umbral, TODOS
-        # los vecinos aquí tienen similitud >= umbral -- un vecino apenas sobre
-        # el corte (ej. 0.66 con umbral 0.65) pesaba casi lo mismo, en términos
-        # relativos, que uno con match casi perfecto (0.95). Restar el umbral
-        # antes de ponderar hace que un vecino "apenas comparable" pese casi
-        # nada de verdad, no solo nominalmente menos.
-        # El respaldo por precio ya construyó `sims` en su propia escala
-        # (0 = borde de la tolerancia, 1 = precio idéntico) -- no tiene
-        # sentido restarle el umbral de similitud VISUAL, que vive en otra
-        # escala (coseno).
-        umbral_activo = umbral_dominio if metodo_score == "visual" else 0.0
-        pesos = np.clip(sims[top] - umbral_activo, 0, None)
-        pesos = pesos / pesos.sum() if pesos.sum() > 0 else np.ones(kk) / kk
-        demanda_proxy = float(np.sum(pesos * velocidades[top]))
-        tendencia_proxy = float(np.sum(pesos * tendencias[top]))
-        rotacion_proxy = float(np.sum(pesos * rotaciones[top]))
-        venta_proxy = float(np.sum(pesos * factores_venta[top]))
-        descuento_proxy = float(np.sum(pesos * pcts_sobre_lista[top]))
-        margen_factor = 1.0  # candidato en staging aún no tiene cotización -- se recalcula tras promover
-
-        # ============================================================
-        # Plan 2026-09-07, paso 2.4: fórmula determinística. La comparación
-        # vectorial es el TÉRMINO PRINCIPAL (score_base, spread medido 9.2x);
-        # tipo/color/atributos/demanda son AJUSTES acotados cerca de 1.0 que
-        # nunca pueden dominarla -- requisito explícito del usuario. Todo lo
-        # que entra acá es (a) un atributo propio del candidato/sus vecinos,
-        # o (b) una constante fija de módulo/tabla congelada -- NADA depende
-        # de qué más exista en staging_tuc ni del estado del catálogo TUC en
-        # el momento de puntuar (mismo candidato -> mismo score, siempre).
-        sim_pond = float(np.sum(pesos * sims[top]))
-        # El respaldo por precio (metodo_score="precio") ya deja sims en una
-        # escala propia [0,1] (0=borde de tolerancia, 1=precio idéntico) --
-        # no es una similitud coseno, así que usa su propio umbral/ancla
-        # (0/1) en vez de UMBRAL_POR_MODELO/ANCLA_SIMILITUD.
-        if metodo_score == "visual":
-            # Dominio 'tuc' explícito (mismo valor de siempre: este canal no
-            # cambia). Ver `ancla_similitud`.
-            umbral_sim = umbral_dominio
-            ancla_sim = ancla_similitud(modelo_activo, "tuc")
-        else:
-            umbral_sim, ancla_sim = 0.0, 1.0
-        sim_norm = min(1.0, max(0.0, (sim_pond - umbral_sim) / (ancla_sim - umbral_sim)))
-        score_base = 100.0 * sim_norm
-
-        # f_soporte: cuánta evidencia real hay detrás del match -- k_efectivo
-        # (inverso de Herfindahl de los pesos) distingue "7 vecinos genuinos"
-        # de "7 vecinos donde 1 solo se lleva todo el peso", cosa que un
-        # conteo simple de vecinos no ve.
-        k_efectivo = float(1.0 / np.sum(pesos ** 2))
-        f_soporte = 0.70 + 0.30 * min(1.0, k_efectivo / K_SOPORTE_PLENO)
-
-        # f_tipo: lee filtro_aplicado (paso 2.3, el camino que REALMENTE
-        # corrió), no categoria_declarada -- detecta también la degradación
-        # invisible de la línea de "mascara.any()" de más arriba.
-        f_tipo = (1.00 if filtro_aplicado == "categoria+genero" else
-                  0.92 if filtro_aplicado in ("solo_categoria", "solo_genero") else
-                  0.85)
-        # Paso 2.5: cierra el vector de gaming "declarar una categoría que no
-        # corresponde a la foto real" -- si el clasificador visual
-        # (categorizar_candidatos) contradice lo que el proveedor declaró,
-        # se aplica el mismo tope que un filtro parcial, sin importar que el
-        # filtro haya corrido completo (categoria+genero ya no basta para
-        # confiar en la categoría si la propia foto la contradice).
-        if categoria_conflicto:
-            f_tipo = min(f_tipo, 0.92)
-
-        # f_color: lift sobre la prevalencia FIJA de ese color en esa
-        # categoría (cfg.prevalencia_color_categoria, paso 2.2) -- un negro
-        # entre negros no es la misma señal en Botas y botines (50% del
-        # catálogo) que en Deportivos (37%). Neutro (1.00) si el candidato no
-        # tiene color mapeado, si no hay categoría de referencia para buscar
-        # la prevalencia, o si menos de 3 vecinos del top tienen color
-        # poblado (evidencia insuficiente para una fracción confiable).
-        f_color = 1.00
-        colores_top = colores_idx[top]
-        con_color = colores_top != None  # noqa: E711 -- np.object_ None real, no NaN
-        if color_candidato_familia and cat_c and con_color.sum() >= 3:
-            peso_con_color = float(np.sum(pesos[con_color]))
-            if peso_con_color > 0:
-                peso_mismo_color = float(np.sum(pesos[con_color & (colores_top == color_candidato_familia)]))
-                frac_obs = peso_mismo_color / peso_con_color
-                prevalencia = mapa_prevalencia.get((cat_c, color_candidato_familia))
-                if prevalencia and prevalencia > 0:
-                    lift = frac_obs / prevalencia
-                    f_color = min(1.10, max(0.90, 0.90 + 0.10 * min(2.0, lift)))
-
-        # f_atrib: homogeneidad de material_norm ENTRE los vecinos -- señal
-        # de CONFIANZA (¿los vecinos concuerdan entre sí?), no de match
-        # candidato-vecino (el candidato no tiene material propio, solo se
-        # deriva de vectorización de vecinos). Neutro si <2 vecinos con
-        # material poblado (homogeneidad de 0-1 muestra no significa nada).
-        f_atrib = 1.00
-        materiales_top = materiales_idx[top]
-        con_material = materiales_top != None  # noqa: E711
-        if con_material.sum() >= 2:
-            peso_con_material = float(np.sum(pesos[con_material]))
-            if peso_con_material > 0:
-                valores_material = materiales_top[con_material]
-                homogeneidad = max(
-                    float(np.sum(pesos[con_material][valores_material == val])) / peso_con_material
-                    for val in set(valores_material)
-                )
-                f_atrib = min(1.05, max(0.95, 0.98 + 0.04 * homogeneidad))
-
-        # f_demanda: SECUNDARIO -- el candidato nunca va a tener demanda
-        # propia (es un producto nuevo, la norma, no la excepción), así que
-        # esto solo matiza el resultado que ya dio la similitud vectorial,
-        # nunca lo reemplaza. REFERENCIA_DEMANDA es la media real fija del
-        # catálogo TUC (17.4 u/mes), no un percentil recalculado.
-        f_demanda = min(1.20, max(0.85, 0.85 + 0.35 * (demanda_proxy / REFERENCIA_DEMANDA)))
-
-        # f_rotacion / f_venta: plan 2026-09-21, pedido directo del dueño --
-        # dos variables medidas que ya existían en la base (rot_mensual =
-        # % Rotación real del Power BI; factor_venta = "Factor venta" del
-        # Excel de rotación) pero nunca llegaban al score. Mismo patrón que
-        # f_demanda: factor acotado, ancla a una mediana real, nunca domina
-        # sobre la similitud vectorial. Sin dato para un vecino, ya se
-        # imputó la referencia (arriba, al armar `rotaciones`/
-        # `factores_venta`) -- ese vecino queda neutro, no penaliza.
-        f_rotacion = min(1.15, max(0.85, 0.85 + 0.30 * (rotacion_proxy / REFERENCIA_ROTACION)))
-        f_venta = min(1.20, max(0.85, 0.85 + 0.35 * (venta_proxy / REFERENCIA_FACTOR_VENTA)))
-
-        # f_descuento: plan 2026-09-21, mismo pedido -- precio_avg/precio_lista
-        # ("Artículos por precio" del Power BI, silver.fct_tuc_precio) es el
-        # proxy objetivo de "ventas sin descuento" que faltaba (ver
-        # REFERENCIA_PCT_SOBRE_LISTA). Mismo patrón: factor acotado, ancla a
-        # la mediana real, nunca domina sobre la similitud vectorial.
-        f_descuento = min(1.15, max(0.85, 0.85 + 0.30 * (descuento_proxy / REFERENCIA_PCT_SOBRE_LISTA)))
-
-        # Paso 7 del plan 2026-09-04: factor de importación/tendencia real
-        # (aduana) por tipo+marca declarados -- 1.0 si no hay dato declarado
-        # (siempre el caso para GestionTUC/PTY, que no puebla esas columnas).
-        # Se mantiene sin cambios (no es parte de las 8 fallas auditadas del
-        # paso 2.4) -- documentado como inerte en este flujo, no removido.
-        factor_mercado = _factor_mercado(cur, candidato_id)
-
-        score_final = round(score_base * f_soporte * f_tipo * f_color * f_atrib
-                             * f_demanda * f_rotacion * f_venta * f_descuento
-                             * margen_factor * factor_mercado, 4)
-        clasificacion = ("S" if score_final >= CORTES_CLASIFICACION["S"] else
-                          "A" if score_final >= CORTES_CLASIFICACION["A"] else
-                          "B" if score_final >= CORTES_CLASIFICACION["B"] else
-                          "C" if score_final >= CORTES_CLASIFICACION["C"] else "D")
-
-        # Paso 2 del plan 2026-09-04: sin esto no había forma de auditar POR QUÉ
-        # un candidato salió "S" o "D" -- antes solo se guardaba `n_vecinos` (un
-        # número). Ordenado por peso descendente para que el primero de la
-        # lista sea el que más influyó en el score.
-        orden_peso = np.argsort(-pesos)
-        vecinos_detalle = [
-            {"codigo_tuc": str(codigos_idx[top[j]]),
-             "similitud": round(float(sims[top[j]]), 4),
-             "peso": round(float(pesos[j]), 4),
-             "metodo": metodo_score}
-            for j in orden_peso
-        ]
-
-        _guardar_score_variante(candidato_id, indice_variante, color_variante, score_final,
-                                clasificacion, kk, round(sim_pond, 4), filtro_aplicado,
-                                metodo_score, modelo_activo=modelo_activo, dominio="tuc")
+        _guardar_score_variante(candidato_id, indice_variante, color_variante, res["score_final"],
+                                res["clasificacion"], res["n_vecinos"], round(res["sim_ponderada"], 4),
+                                filtro_aplicado, res["metodo_score"],
+                                modelo_activo=modelo_activo, dominio="tuc")
         if indice_variante != 0:
             # `candidato_score` sigue siendo la fila de la VARIANTE 0 tal cual
             # se escribía antes (es la que lee el desglose «¿por qué?» y la
@@ -4572,9 +4696,6 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
             # `candidato_score_variante` en `api_candidatos`.
             continue
 
-        # FASE 2: mismo UPSERT, en el `lote.sqlite`. `psycopg2.extras.Json`
-        # (que serializaba a `jsonb`) pasa a ser un `json.dumps` explícito a
-        # TEXT, y `now()` lo pone Python.
         cl.execute("""
             INSERT INTO candidato_score
                 (candidato_id, demanda_proxy, tendencia_proxy, margen_factor, n_vecinos,
@@ -4598,13 +4719,17 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
                 f_descuento=excluded.f_descuento, descuento_proxy=excluded.descuento_proxy,
                 version_formula=excluded.version_formula, modelo_activo=excluded.modelo_activo,
                 dominio=excluded.dominio, fecha_calculo=excluded.fecha_calculo
-        """, (candidato_id, round(demanda_proxy, 3), round(tendencia_proxy, 3), round(margen_factor, 3),
-              kk, score_final, clasificacion, json.dumps(vecinos_detalle, ensure_ascii=False),
-              round(factor_mercado, 4), filtro_aplicado,
-              round(sim_pond, 4), round(k_efectivo, 3), round(f_soporte, 4), round(f_tipo, 4),
-              round(f_color, 4), round(f_atrib, 4), round(f_demanda, 4),
-              round(f_rotacion, 4), round(f_venta, 4), round(rotacion_proxy, 3), round(venta_proxy, 3),
-              round(f_descuento, 4), round(descuento_proxy, 3),
+        """, (candidato_id, round(res["demanda_proxy"], 3), round(res["tendencia_proxy"], 3),
+              round(res["margen_factor"], 3),
+              res["n_vecinos"], res["score_final"], res["clasificacion"],
+              json.dumps(res["vecinos_detalle"], ensure_ascii=False),
+              round(res["factor_mercado"], 4), filtro_aplicado,
+              round(res["sim_ponderada"], 4), round(res["k_efectivo"], 3), round(res["f_soporte"], 4),
+              round(res["f_tipo"], 4),
+              round(res["f_color"], 4), round(res["f_atrib"], 4), round(res["f_demanda"], 4),
+              round(res["f_rotacion"], 4), round(res["f_venta"], 4),
+              round(res["rotacion_proxy"], 3), round(res["venta_proxy"], 3),
+              round(res["f_descuento"], 4), round(res["descuento_proxy"], 3),
               "2026-09-21-v3", modelo_activo, "tuc", almacen.ahora()))
 
 
