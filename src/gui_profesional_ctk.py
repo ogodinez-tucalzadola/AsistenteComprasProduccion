@@ -414,6 +414,7 @@ class Barra(ctk.CTkProgressBar):
             try:
                 super().set(min(max(float(valor) / self._maximo, 0.0), 1.0))
             except (TypeError, ValueError):
+                # Barra.set con un valor no numerico: la barra se deja como esta.
                 pass
 
     def start(self, intervalo=None):  # ttk.Progressbar.start(ms)
@@ -866,6 +867,7 @@ class GrillaRecortes(ctk.CTkScrollableFrame):
             try:
                 self.after_cancel(self._tarea_lote)
             except (ValueError, tk.TclError):
+                # after_cancel de una tarea ya disparada/ventana cerrada: nada que cancelar.
                 pass
         self._tarea_lote = self.after(40, self._cargar_lote)
 
@@ -888,6 +890,7 @@ class GrillaRecortes(ctk.CTkScrollableFrame):
                     try:
                         im = self._componer(Image.open(png))
                     except Exception:  # noqa: BLE001
+                        _logger_gui().exception("no se pudo cargar la miniatura del recorte %s", png)
                         im = None
             if im is None:
                 im = Image.new("RGB", (self.LADO_MINIATURA, self.LADO_MINIATURA),
@@ -979,6 +982,7 @@ class HerramientaUnica(ctk.CTk):
             import motor_calificacion
             motor_calificacion.fijar_lote(self.__salida)
         except Exception as exc:  # noqa: BLE001
+            _logger_gui().exception("no se pudo declarar el lote activo al motor de calificacion")
             # Que el motor no se pueda avisar NO debe tumbar la interfaz: la
             # carpeta igual queda fijada y los pasos 1-5 (limpieza de fotos) no
             # dependen del motor de calificación en absoluto. El paso 6 sí, y
@@ -1152,6 +1156,7 @@ class HerramientaUnica(ctk.CTk):
             from customtkinter.windows.widgets.scaling import ScalingTracker
             escala = ScalingTracker.get_window_scaling(self) or 1.0
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo leer la escala de la ventana; se asume 1.0")
             escala = 1.0
         # Margen para la barra de tareas y el borde de la ventana.
         max_ancho = int((self.winfo_screenwidth() - 40) / escala)
@@ -1175,6 +1180,7 @@ class HerramientaUnica(ctk.CTk):
                     try:
                         psutil.Process(p.pid).resume()
                     except psutil.Error:
+                        # el proceso ya termino por su cuenta: no hay nada que reanudar.
                         pass
             for p in vivos:
                 p.terminate()
@@ -1192,6 +1198,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             style.theme_use("clam")
         except tk.TclError:
+            # tema "clam" no disponible en esta instalacion de Tk: se usa el nativo.
             pass
         style.configure(".", background=COLOR_PANEL, foreground=COLOR_TEXTO,
                         fieldbackground=COLOR_PANEL, font=FUENTE_BASE,
@@ -1649,6 +1656,7 @@ class HerramientaUnica(ctk.CTk):
             if monitor.winfo_manager():
                 monitor.pack_forget()
         except tk.TclError:
+            # monitor ya destruido/no empaquetado: no hay nada que ocultar.
             pass
 
     # ── consola de detalle técnico (colapsada por defecto) ───────────────
@@ -1710,6 +1718,7 @@ class HerramientaUnica(ctk.CTk):
             caja.delete("1.0", "end")
             caja.configure(state="disabled")
         except Exception:  # noqa: BLE001
+            # consola de detalle ya destruida (pantalla reconstruida): nada que limpiar.
             pass
         self._lineas_consola = 0
 
@@ -1731,6 +1740,7 @@ class HerramientaUnica(ctk.CTk):
             caja.see("end")
             caja.configure(state="disabled")
         except Exception:  # noqa: BLE001
+            # consola de detalle ya destruida: la linea de log simplemente no se ve.
             pass
 
     # ── pantalla 2: revisar fotos (lista + visor + decisión) ─────────────
@@ -3318,6 +3328,7 @@ class HerramientaUnica(ctk.CTk):
                 mod = importlib.import_module(modulo)
                 resultado["resumen"] = mod.extraer_lista(archivos, destino, control=control)
             except Exception as exc:  # noqa: BLE001
+                _logger_gui().exception("fallo la extraccion con el modulo %s", modulo)
                 resultado["error"] = str(exc)
 
         hilo = threading.Thread(target=trabajar, daemon=True)
@@ -3424,6 +3435,7 @@ class HerramientaUnica(ctk.CTk):
                     ruta.unlink()
                 borradas += 1
             except OSError:
+                _logger_gui().exception("no se pudo borrar la foto parcial %s", ruta)
                 fallidas += 1
         self.v_log.set(f"Extracción de {etiqueta} cancelada: se descartaron "
                        f"{borradas} foto(s) parciales.")
@@ -3518,10 +3530,12 @@ class HerramientaUnica(ctk.CTk):
                     # con cientos de fotos, abrir a tamaño completo sería lento.
                     im.draft("RGB", (self.MINIATURA_REVISION, self.MINIATURA_REVISION))
                 except Exception:  # noqa: BLE001
+                    # draft() es solo una optimizacion de lectura: si no aplica, se sigue igual.
                     pass
                 im = im.convert("RGB")
                 im.thumbnail((self.MINIATURA_REVISION, self.MINIATURA_REVISION))
             except Exception:  # noqa: BLE001
+                _logger_gui().exception("no se pudo abrir la miniatura de revision %s", path)
                 im = Image.new("RGB", (self.MINIATURA_REVISION, self.MINIATURA_REVISION),
                                COLOR_VISOR_BG)
             foto = ImageTk.PhotoImage(im)
@@ -3630,6 +3644,7 @@ class HerramientaUnica(ctk.CTk):
                         or (carpeta / "fondo_transparente").is_dir()
                         or list(carpeta.glob("exportacion_*.json")))
         except OSError:
+            _logger_gui().exception("no se pudo inspeccionar la carpeta de trabajo %s", carpeta)
             return False
 
     def _elegir_salida(self, usar_texto: bool = False) -> None:
@@ -3754,6 +3769,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             return almacen.leer_meta(carpeta)
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudieron leer los metadatos del lote en %s", carpeta)
             return {}
 
     # ---------- moneda / tipo de cambio / margen DEL LOTE ----------
@@ -3786,10 +3802,12 @@ class HerramientaUnica(ctk.CTk):
         try:
             margen_f = float(margen or MARGEN_VENTA_DEFAULT)
         except (TypeError, ValueError):
+            # margen no numerico guardado en el lote: se cae al margen por defecto.
             margen_f = MARGEN_VENTA_DEFAULT
         try:
             tc_f = float(tipo_cambio) if tipo_cambio else None
         except (TypeError, ValueError):
+            # tipo de cambio no numerico guardado en el lote: se deja sin convertir.
             tc_f = None
         return {"moneda": moneda or None, "tipo_cambio": tc_f, "margen": margen_f}
 
@@ -3957,6 +3975,7 @@ class HerramientaUnica(ctk.CTk):
             try:
                 guardado = json.loads(guardado)
             except ValueError:
+                _logger_gui().exception("respaldo de costos del lote ilegible (JSON invalido)")
                 guardado = None
         return guardado if isinstance(guardado, dict) else {}
 
@@ -3989,6 +4008,7 @@ class HerramientaUnica(ctk.CTk):
             try:
                 guardado = json.loads(guardado)
             except ValueError:
+                _logger_gui().exception("respaldo de categorias del lote ilegible (JSON invalido)")
                 guardado = None
         return guardado if isinstance(guardado, dict) else {}
 
@@ -4122,6 +4142,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             mes = int(datos.get("mes_venta_esperado") or 0)
         except (TypeError, ValueError):
+            # mes de venta guardado no numerico: se trata como "no preguntado todavia".
             return None
         return mes if 1 <= mes <= 12 else None
 
@@ -4162,6 +4183,7 @@ class HerramientaUnica(ctk.CTk):
             try:
                 mes = self.MESES_ES.index(v_mes.get()) + 1
             except ValueError:
+                _logger_gui().exception("mes elegido no reconocido en el dialogo de mes de venta")
                 return
             self._guardar_marca_lote(mes_venta_esperado=mes)
             elegido["mes"] = mes
@@ -4556,6 +4578,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             texto = self.ARCHIVO_CONFIG_SESION.read_text(encoding="utf-8")
         except OSError:
+            # primera corrida o archivo de sesion borrado: se pide la carpeta a mano.
             return None
         try:
             salida = json.loads(texto).get("salida")
@@ -4591,6 +4614,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             return almacen.contar_recortes(carpeta)
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudieron contar los recortes de %s", carpeta)
             return 0
 
     def _preguntar_retomar_o_nuevo(self, carpeta: Path, n_recortes: int) -> bool:
@@ -4654,6 +4678,7 @@ class HerramientaUnica(ctk.CTk):
             try:
                 mtime = carpeta.stat().st_mtime
             except OSError:
+                # carpeta borrada mientras se listaba: queda al final del orden por fecha.
                 mtime = 0
             proyectos.append({"carpeta": carpeta, "nombre": str(nombre),
                               "n_recortes": n, "mtime": mtime})
@@ -4975,11 +5000,13 @@ class HerramientaUnica(ctk.CTk):
                 else:
                     item.unlink()
             except OSError:
+                _logger_gui().exception("no se pudo borrar %s al vaciar la carpeta de trabajo", item)
                 errores += 1
 
         try:
             almacen.vaciar(self._salida)
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo vaciar el almacen del lote %s", self._salida)
             errores += 1
 
         self._recortes = {}
@@ -5275,6 +5302,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             barra.configure(value=pct)
         except tk.TclError:
+            # barra de progreso de compras ya destruida: el % simplemente no se pinta.
             pass
 
     def _mostrar_progreso_compras(self) -> None:
@@ -5293,6 +5321,7 @@ class HerramientaUnica(ctk.CTk):
                 else:
                     marco.pack(fill="x", pady=(8, 0))
         except tk.TclError:
+            # bloque de progreso de compras ya destruido: no hay nada que mostrar.
             pass
 
     def _ocultar_progreso_compras(self) -> None:
@@ -5303,6 +5332,7 @@ class HerramientaUnica(ctk.CTk):
             if marco.winfo_manager():
                 marco.pack_forget()
         except tk.TclError:
+            # bloque de progreso de compras ya destruido: no hay nada que ocultar.
             pass
 
     def _cambiar_btn_compras(self, habilitado: bool) -> None:
@@ -5317,6 +5347,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             btn.state(["!disabled"] if habilitado else ["disabled"])
         except tk.TclError:
+            # boton de pie ya destruido (cambio de paso): no hay nada que habilitar.
             pass
 
     def _deshabilitar_btn_compras(self) -> None:
@@ -5342,6 +5373,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             btn.configure(text=self.TEXTO_SIGUIENTE.get(4, "Continuar  →"))
         except tk.TclError:
+            # boton de pie ya destruido: el rotulo se vuelve a fijar al rearmar el paso.
             pass
 
     def _accion_boton_compras(self) -> None:
@@ -5754,6 +5786,7 @@ class HerramientaUnica(ctk.CTk):
             caja.see("end")
             caja.configure(state="disabled")
         except Exception:  # noqa: BLE001
+            # consola del paso de vectorizacion ya destruida: la linea no se ve.
             pass
 
     def _bloquear_btn_calcular(self, bloqueado: bool) -> None:
@@ -5763,6 +5796,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             btn.state(["disabled"] if bloqueado else ["!disabled"])
         except tk.TclError:
+            # boton "calcular vectorizacion" ya destruido: nada que bloquear.
             pass
 
     def _calcular_vectorizacion_y_continuar(self) -> None:
@@ -5819,6 +5853,7 @@ class HerramientaUnica(ctk.CTk):
             caja.delete("1.0", "end")
             caja.configure(state="disabled")
         except Exception:  # noqa: BLE001
+            # consola de vectorizacion ya destruida: nada que limpiar.
             pass
         self._lineas_consola_vector = 0
 
@@ -6087,6 +6122,7 @@ class HerramientaUnica(ctk.CTk):
                     try:
                         del_lote = self._candidatos_del_lote()
                     except Exception:  # noqa: BLE001
+                        _logger_gui().exception("no se pudieron releer los candidatos del lote tras el envio")
                         del_lote = None
                     self._mostrar_vista_candidatos(del_lote or dato)
                 elif tipo == "cand_error":
@@ -6133,6 +6169,7 @@ class HerramientaUnica(ctk.CTk):
                             f"Carpeta activa: {self._salida}  ·  {len(self._recortes)} recorte(s) cargados")
                     self._aterrizar_en_revision()
         except queue.Empty:
+            # cola vacia: es el caso normal de cada ciclo del bombeo, no un error.
             pass
         self._revisar_sin_actividad()
         self.after(150, self._bombear_cola)
@@ -6300,6 +6337,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             im = Image.open(path).convert("RGB")
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo abrir la foto del visor en vivo: %s", path)
             return
         im = self._ajustar_a_espacio(im, self._espacio_visor())
         self._foto_visor_vivo = ImageTk.PhotoImage(im)
@@ -6334,6 +6372,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             campos = json.loads(linea[5:])
         except json.JSONDecodeError:
+            _logger_gui().exception("linea de progreso del worker ilegible: %r", linea)
             return
         evento = campos.get("evento")
 
@@ -6394,6 +6433,7 @@ class HerramientaUnica(ctk.CTk):
                         self._mostrar_imagen_pil(im_lineas, f"Recorte{extra} — línea azul: borde "
                                                              f"real, línea roja: curva esperada")
                     except Exception:  # noqa: BLE001
+                        _logger_gui().exception("no se pudo dibujar el contorno del recorte %s", ruta_recorte)
                         self._mostrar_grande(ruta_recorte, f"Recorte{extra}")
 
             if paso == "excedente_recortado" and campos.get("recorte"):
@@ -6427,6 +6467,7 @@ class HerramientaUnica(ctk.CTk):
             im = reparar.dibujar_contorno(candidatos[0])
             self._mostrar_imagen_pil(im, titulo)
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo dibujar el contorno de %s; se muestra sin lineas", candidatos[0])
             self._mostrar_grande(candidatos[0], titulo)
 
     def _actualizar_progreso(self) -> None:
@@ -6607,6 +6648,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             self._seleccionar_real()
         except Exception as exc:  # noqa: BLE001
+            _logger_gui().exception("fallo al mostrar el recorte seleccionado")
             import traceback
             traceback.print_exc()
             self.v_log.set(f"Error mostrando esta foto: {exc}")
@@ -6697,15 +6739,17 @@ class HerramientaUnica(ctk.CTk):
             r["estado"]["falta_pct"] = round(reparar.porcentaje_faltante(s), 2)
             r["estado"]["mordida_real"] = reparar.tiene_mordida_real(s)
         except ValueError:
+            # medicion imposible (recorte vacio): se reporta como 0% faltante.
             r["estado"]["falta_pct"] = 0.0
             r["estado"]["mordida_real"] = False
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo medir el estado del recorte %s", png)
             return
         try:
             r["estado"]["tiene_excedente"] = reparar.tiene_excedente(
                 png, color_basura=reparar.COLOR_BASURA)
         except Exception:  # noqa: BLE001
-            pass
+            _logger_gui().exception("no se pudo medir el excedente del recorte %s", png)
 
     def _tras_corregir(self, nombre: str, mensaje: str) -> None:
         """Refresca todo lo que muestra ese recorte después de tocarlo: la
@@ -6778,6 +6822,7 @@ class HerramientaUnica(ctk.CTk):
         try:
             boton.configure(text=texto_trabajando)
         except tk.TclError:
+            # barra "CORREGIR ESTA FOTO" ya destruida: no hay rotulo que cambiar.
             pass
         for b in (self.btn_reparar_suela, self.btn_recortar_sombra,
                   self.btn_revertir_recorte):
@@ -6790,6 +6835,7 @@ class HerramientaUnica(ctk.CTk):
             boton.configure(text=getattr(self, "_texto_btn_correccion", None)
                             or boton.cget("text"))
         except tk.TclError:
+            # barra "CORREGIR ESTA FOTO" ya destruida: no hay rotulo que restaurar.
             pass
         self.configure(cursor="")
         # Quién queda habilitado y quién no lo decide `_seleccionar_real`
@@ -7345,6 +7391,7 @@ class HerramientaUnica(ctk.CTk):
                     reparar.aplicar(self._salida, Path(nombre).stem, res)
                     aplicado_algo = True
             except ValueError:
+                # ValueError aca no es fallo: es "no habia nada que corregir" en esa foto.
                 pass
             except Exception as exc:  # noqa: BLE001
                 self.v_log.set(f"{nombre}: no se pudo rehacer la limpieza ({exc})")
@@ -7598,7 +7645,7 @@ class HerramientaUnica(ctk.CTk):
                     self._fotos_resumen.append(foto)
                     lbl_orig.configure(image=foto)
                 except Exception:  # noqa: BLE001
-                    pass
+                    _logger_gui().exception("no se pudo cargar la lamina original en el resumen final")
                 # La lámina original también se amplía con un clic, igual que
                 # los recortes: es la foto más chica de la fila y la que menos
                 # se deja mirar en 104px. Se reusa el mismo visor del paso de
@@ -7631,7 +7678,7 @@ class HerramientaUnica(ctk.CTk):
                         self._fotos_resumen.append(foto)
                         lbl_rec.configure(image=foto)
                     except Exception:  # noqa: BLE001
-                        pass
+                        _logger_gui().exception("no se pudo cargar la miniatura del recorte en el resumen final")
                 color_dec = {"aprobado": COLOR_OK, "descartado": COLOR_MAL}.get(decision, COLOR_TEXTO_SUAVE)
                 lbl_dec = tk.Label(fila, text=decision, fg=color_dec, bg=COLOR_PANEL,
                                    font=FUENTE_CHICA)
@@ -7792,7 +7839,7 @@ class HerramientaUnica(ctk.CTk):
                 self._fotos_resumen.append(foto)  # mantener referencia viva
                 lbl_rec.configure(image=foto)
             except Exception:  # noqa: BLE001
-                pass
+                _logger_gui().exception("no se pudo cargar la miniatura del recorte en la fila de resumen")
         decision = r.get("estado", {}).get("decision", "pendiente")
         color_dec = {"aprobado": COLOR_OK, "descartado": COLOR_MAL}.get(decision, COLOR_TEXTO_SUAVE)
         lbl_dec.configure(text=decision, fg=color_dec)
@@ -8125,6 +8172,7 @@ def calcular_precio_venta(costo, moneda: str, tipo_cambio: float | None,
     try:
         costo = float(costo)
     except (TypeError, ValueError):
+        # costo no numerico (campo vacio o texto): no hay precio que calcular.
         return None
     if costo <= 0:
         return None
@@ -8219,6 +8267,7 @@ def reloj(widget):
         widget.configure(cursor="watch")
         widget.update_idletasks()
     except tk.TclError:
+        # widget destruido antes de poner el reloj de arena: no es un fallo.
         pass
     try:
         yield
@@ -8226,6 +8275,7 @@ def reloj(widget):
         try:
             widget.configure(cursor="")
         except tk.TclError:
+            # widget destruido antes de quitar el reloj de arena: no es un fallo.
             pass
 
 
@@ -8247,6 +8297,7 @@ def _traer_al_frente(ventana) -> None:
             ventana.lift()
             ventana.focus_force()
         except tk.TclError:
+            # ventana cerrada antes de traerla al frente: no hay nada que hacer.
             return
         ventana.after(200, _paso2)
 
@@ -8254,11 +8305,13 @@ def _traer_al_frente(ventana) -> None:
         try:
             ventana.attributes("-topmost", False)
         except tk.TclError:
+            # ventana cerrada antes de soltar el "siempre encima": no es un fallo.
             pass
 
     try:
         ventana.after(80, _paso1)
     except tk.TclError:
+        # ventana cerrada antes de agendar el traer-al-frente: no es un fallo.
         pass
 
 
@@ -8270,6 +8323,7 @@ def _cargar_foto_generico(ruta: Path | None, tam=(90, 90)) -> ImageTk.PhotoImage
         im.thumbnail(tam)
         return ImageTk.PhotoImage(im)
     except Exception:  # noqa: BLE001
+        _logger_gui().exception("no se pudo cargar la foto %s", ruta)
         return None
 
 
@@ -8398,6 +8452,7 @@ def _texto_sobre(hex_fondo: str) -> str:
         h = hex_fondo.lstrip("#")
         r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
     except (ValueError, IndexError):
+        # color de fondo con formato inesperado: se asume texto negro.
         return "#000000"
 
     def canal(c: float) -> float:
@@ -8728,6 +8783,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         try:
             i = orden.index(pid)
         except ValueError:
+            # proveedor fuera de la lista en pantalla: se le da el ultimo color libre.
             i = len(orden)
         return self.PALETA_PROVEEDOR[i % len(self.PALETA_PROVEEDOR)]
 
@@ -8793,6 +8849,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
                 if tarjeta.winfo_manager():
                     tarjeta.pack_forget()
             except tk.TclError:
+                # tarjeta ya destruida (pantalla recargada): no hay nada que despackar.
                 pass
         # Se vuelven a packar EN ORDEN: `pack` respeta el orden de llamada, así
         # que la lista mantiene su orden por calificación.
@@ -8802,6 +8859,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 tarjeta.pack(fill="x", pady=4)
             except tk.TclError:
+                # tarjeta ya destruida (pantalla recargada): no hay nada que volver a packar.
                 pass
 
     def _cfg_de(self, cand: dict) -> dict:
@@ -8989,6 +9047,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         try:
             self._estado_guardado.configure(text=texto)
         except tk.TclError:
+            # cartelito de "guardado" ya destruido: el aviso simplemente no se ve.
             pass
 
     def _decir_margen(self, texto: str) -> None:
@@ -9074,6 +9133,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         try:
             costo, moneda_fila = self._mc.obtener_costo_declarado(cand["candidato_id"])
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo leer el costo declarado del candidato %s", cand["candidato_id"])
             costo, moneda_fila = None, None
 
         # Mutable para que `guardar_costo` pueda actualizar lo que ve
@@ -9148,6 +9208,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 etq_pendiente.configure(text="● sin guardar" if hay_cambio() else "")
             except tk.TclError:
+                # etiqueta "sin guardar" ya destruida: no hay marca pendiente que pintar.
                 pass
 
         # Registro para el botón único «💾 Guardar lote» (2026-09-10): la
@@ -9280,6 +9341,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         try:
             guardar(self._costos_lote)
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo guardar el respaldo de costos del lote")
             return False
         return True
 
@@ -9310,6 +9372,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 costo = float(guardado.get("costo"))
             except (TypeError, ValueError):
+                # costo respaldado no numerico: se salta ese candidato al restaurar.
                 continue
             moneda = guardado.get("moneda")
             if costo <= 0 or not moneda_valida(moneda):
@@ -9638,6 +9701,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 self._cache_marcas = self._mc.marcas_reconocidas()
             except Exception:  # noqa: BLE001
+                _logger_gui().exception("no se pudieron consultar las marcas reconocidas")
                 self._cache_marcas = []
         return self._cache_marcas
 
@@ -9840,6 +9904,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 variante_id = int(url.rsplit("/", 1)[-1])
             except ValueError:
+                # URL de variante sin id numerico al final: se salta ese chip de color.
                 continue
             chip = Marco(fila_fotos)
             chip.pack(side="left", padx=(0, 10))
@@ -10067,6 +10132,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         try:
             variante_id = int(url.rsplit("/", 1)[-1])
         except ValueError:
+            # URL de variante sin id numerico al final: la tarjeta va sin foto.
             return None
         # 114px para llenar el hueco de 120 de la tarjeta (antes 90 en un
         # hueco de 96): la foto es lo que el comprador mira primero.
@@ -10095,6 +10161,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 win.destroy()
             except tk.TclError:
+                # ventana de comparables ya cerrada por el usuario: nada que destruir.
                 pass
 
     def _mostrar_desglose_score(self, cand: dict) -> None:
@@ -10188,6 +10255,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
                 try:
                     disparador.configure(state="normal")
                 except (tk.TclError, ValueError):
+                    # boton disparador ya destruido: no hay nada que rehabilitar.
                     pass
 
     def _abrir_comparables_real(self, cand: dict, disparador=None,
@@ -10197,6 +10265,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
                 disparador.configure(state="disabled")
                 disparador.update_idletasks()
             except (tk.TclError, ValueError):
+                # boton disparador ya destruido: no hay nada que deshabilitar.
                 pass
         self._limpiar_panel_comparables()
 
@@ -10250,6 +10319,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 precio, _fuente = self._mc.obtener_precio_referencia(cand["candidato_id"])
             except Exception:  # noqa: BLE001
+                _logger_gui().exception("no se pudo leer el precio de referencia del candidato %s", cand["candidato_id"])
                 continue
             if not precio:
                 continue
@@ -10405,6 +10475,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
         try:
             resumen = self._mc.resumen_catalogo_activo()
         except Exception:  # noqa: BLE001
+            _logger_gui().exception("no se pudo leer el resumen del catalogo activo")
             return "este proveedor"
         return (resumen[0].get("proveedor") or "este proveedor") if resumen else "este proveedor"
 
@@ -10622,6 +10693,7 @@ class VentanaCandidatosCTk(ctk.CTkFrame):
             try:
                 return leer(carpeta)
             except Exception:  # noqa: BLE001
+                _logger_gui().exception("no se pudo leer el respaldo de costos del lote en %s", carpeta)
                 return {}
         return {}
 
@@ -10974,6 +11046,7 @@ class PanelComparablesCTk(ctk.CTkFrame):
         try:
             descuento_pct = float(self._v_descuento.get() or 0)
         except ValueError:
+            # descuento no numerico o vacio: se cotiza sin descuento.
             descuento_pct = 0.0
         moneda = self._v_moneda.get()
         tipo_cambio_txt = self._v_tipo_cambio.get().strip()
