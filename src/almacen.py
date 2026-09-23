@@ -346,7 +346,9 @@ CREATE TABLE IF NOT EXISTS candidato_score (
     venta_proxy     REAL,
     f_descuento     REAL,
     descuento_proxy REAL,
-    version_formula TEXT
+    version_formula TEXT,
+    modelo_activo   TEXT,
+    dominio         TEXT
 );
 
 -- El score de CADA color (variante) de la referencia — 2026-09-17, pedido
@@ -372,6 +374,8 @@ CREATE TABLE IF NOT EXISTS candidato_score_variante (
     sim_ponderada   REAL,
     filtro_aplicado TEXT,
     metodo_score    TEXT,
+    modelo_activo   TEXT,
+    dominio         TEXT,
     fecha_calculo   TEXT NOT NULL,
     PRIMARY KEY (candidato_id, indice)
 );
@@ -413,23 +417,42 @@ def _dej(texto, default=None):
         return default
 
 
-_COLUMNAS_NUEVAS_CANDIDATO_SCORE = ("f_rotacion", "f_venta", "rotacion_proxy", "venta_proxy",
-                                     "f_descuento", "descuento_proxy")
+_COLUMNAS_NUEVAS_CANDIDATO_SCORE = (
+    ("f_rotacion", "REAL"), ("f_venta", "REAL"), ("rotacion_proxy", "REAL"),
+    ("venta_proxy", "REAL"), ("f_descuento", "REAL"), ("descuento_proxy", "REAL"),
+    # Plan de mejora 2026-09-22: sin esto no se puede saber, mirando una fila
+    # ya escrita, con qué modelo de vectorización (ti/estandar/fashion/dino) ni
+    # contra qué dominio (tuc/marca) se calculó ese score -- un diagnóstico
+    # real (Etapa "ancla de similitud") necesitó INFERIR el modelo por qué
+    # embeddings tenía cada lote, en vez de leerlo directo. Ver
+    # PLAN_MEJORA_ETAPAS.md.
+    ("modelo_activo", "TEXT"), ("dominio", "TEXT"),
+)
+
+_COLUMNAS_NUEVAS_CANDIDATO_SCORE_VARIANTE = (
+    ("modelo_activo", "TEXT"), ("dominio", "TEXT"),
+)
+
+
+def _migrar_columnas(con, tabla: str, columnas: tuple[tuple[str, str], ...]) -> None:
+    """Agrega columnas que faltan a una tabla ya creada -- `CREATE TABLE IF
+    NOT EXISTS` no las agrega a un `lote.sqlite` que ya existía antes del
+    cambio. Idempotente vía `PRAGMA table_info`, no falla ni duplica nada si
+    se corre en cada apertura del lote."""
+    existentes = {fila[1] for fila in con.execute(f"PRAGMA table_info({tabla})")}
+    for columna, tipo in columnas:
+        if columna not in existentes:
+            con.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
 
 
 def _migrar_columnas_candidato_score(con) -> None:
     """Plan 2026-09-21: rotación (`% Rotación` real, gold.agg_tuc_metricas),
     `factor_venta` y `pct_sobre_lista` (precio_avg/precio_lista, "Artículos
     por precio" del Power BI) se conectan al score como factores objetivos
-    más, igual que `f_demanda` -- `CREATE TABLE IF NOT EXISTS` no agrega
-    columnas a una tabla que ya existe, así que un `lote.sqlite` creado ANTES
-    de este cambio necesita el ALTER explícito. Idempotente: se fija con
-    `PRAGMA table_info` antes de agregar cada columna, así que correr esto
-    en cada apertura no falla ni duplica nada."""
-    existentes = {fila[1] for fila in con.execute("PRAGMA table_info(candidato_score)")}
-    for columna in _COLUMNAS_NUEVAS_CANDIDATO_SCORE:
-        if columna not in existentes:
-            con.execute(f"ALTER TABLE candidato_score ADD COLUMN {columna} REAL")
+    más, igual que `f_demanda`. Plan de mejora 2026-09-22: se suma
+    `modelo_activo`/`dominio` (ver comentario en la tupla de columnas)."""
+    _migrar_columnas(con, "candidato_score", _COLUMNAS_NUEVAS_CANDIDATO_SCORE)
+    _migrar_columnas(con, "candidato_score_variante", _COLUMNAS_NUEVAS_CANDIDATO_SCORE_VARIANTE)
 
 
 @contextmanager

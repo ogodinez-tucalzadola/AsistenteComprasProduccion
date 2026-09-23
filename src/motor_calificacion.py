@@ -3050,22 +3050,30 @@ def variantes_a_calificar(candidato_id: int, modelo_activo: str = "estandar"):
 
 def _guardar_score_variante(candidato_id: int, indice: int, color_principal, score_final,
                             clasificacion: str, n_vecinos: int, sim_ponderada,
-                            filtro_aplicado, metodo_score) -> None:
+                            filtro_aplicado, metodo_score,
+                            modelo_activo: str | None = None, dominio: str | None = None) -> None:
     """El score de UN color. `candidato_score` (la fila de la unidad de compra)
     no se toca acá: sigue escribiéndose como siempre desde el camino de la
-    variante 0."""
+    variante 0.
+
+    `modelo_activo`/`dominio` (plan de mejora 2026-09-22): con qué modelo de
+    vectorización (ti/estandar/fashion/dino) y contra qué dominio (tuc/marca)
+    se calculó ESTE score -- sin esto, medir a futuro si el ancla de
+    similitud sigue calibrada obliga a INFERIR el modelo por qué embeddings
+    tiene el lote, en vez de leerlo directo (ver PLAN_MEJORA_ETAPAS.md)."""
     _cl().execute("""
         INSERT INTO candidato_score_variante
             (candidato_id, indice, color_principal, score_final, clasificacion, n_vecinos,
-             sim_ponderada, filtro_aplicado, metodo_score, fecha_calculo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             sim_ponderada, filtro_aplicado, metodo_score, modelo_activo, dominio, fecha_calculo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (candidato_id, indice) DO UPDATE SET
             color_principal=excluded.color_principal, score_final=excluded.score_final,
             clasificacion=excluded.clasificacion, n_vecinos=excluded.n_vecinos,
             sim_ponderada=excluded.sim_ponderada, filtro_aplicado=excluded.filtro_aplicado,
-            metodo_score=excluded.metodo_score, fecha_calculo=excluded.fecha_calculo
+            metodo_score=excluded.metodo_score, modelo_activo=excluded.modelo_activo,
+            dominio=excluded.dominio, fecha_calculo=excluded.fecha_calculo
     """, (candidato_id, indice, color_principal, score_final, clasificacion, n_vecinos,
-          sim_ponderada, filtro_aplicado, metodo_score, almacen.ahora()))
+          sim_ponderada, filtro_aplicado, metodo_score, modelo_activo, dominio, almacen.ahora()))
 
 
 def _limpiar_scores_variante(candidato_ids) -> None:
@@ -3730,7 +3738,8 @@ def _guardar_score_candidato(cl, candidato_id, *, demanda_proxy, tendencia_proxy
                               sim_ponderada, k_efectivo, f_soporte, f_tipo, f_color,
                               f_atrib, f_demanda, f_rotacion, rotacion_proxy,
                               f_venta, venta_proxy,
-                              f_descuento, descuento_proxy, version_formula):
+                              f_descuento, descuento_proxy, version_formula,
+                              modelo_activo: str | None = None, dominio: str | None = None):
     """El UPSERT de `candidato_score`, para el canal marca.
 
     Es el MISMO INSERT que escribe el canal genérico más abajo, escrito una
@@ -3739,6 +3748,9 @@ def _guardar_score_candidato(cl, candidato_id, *, demanda_proxy, tendencia_proxy
     así que sí, la sentencia aparece dos veces en el archivo -- es deliberado.
     `f_venta`/`venta_proxy` usan `silver.fct_tcm_rotacion` (mismo reporte
     Power BI de rotación que TUCALZADO, filtrado a Catalogo=TCMARCAS).
+
+    `modelo_activo`/`dominio`: ver nota en `_guardar_score_variante` -- misma
+    razón, distinta tabla (plan de mejora 2026-09-22).
     """
     cl.execute("""
         INSERT INTO candidato_score
@@ -3746,8 +3758,8 @@ def _guardar_score_candidato(cl, candidato_id, *, demanda_proxy, tendencia_proxy
              score_final, clasificacion, vecinos_detalle, factor_mercado, filtro_aplicado,
              sim_ponderada, k_efectivo, f_soporte, f_tipo, f_color, f_atrib, f_demanda,
              f_rotacion, rotacion_proxy, f_venta, venta_proxy, f_descuento, descuento_proxy,
-             version_formula, fecha_calculo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             version_formula, modelo_activo, dominio, fecha_calculo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (candidato_id) DO UPDATE SET
             demanda_proxy=excluded.demanda_proxy, tendencia_proxy=excluded.tendencia_proxy,
             margen_factor=excluded.margen_factor, n_vecinos=excluded.n_vecinos,
@@ -3760,12 +3772,13 @@ def _guardar_score_candidato(cl, candidato_id, *, demanda_proxy, tendencia_proxy
             f_rotacion=excluded.f_rotacion, rotacion_proxy=excluded.rotacion_proxy,
             f_venta=excluded.f_venta, venta_proxy=excluded.venta_proxy,
             f_descuento=excluded.f_descuento, descuento_proxy=excluded.descuento_proxy,
-            version_formula=excluded.version_formula, fecha_calculo=excluded.fecha_calculo
+            version_formula=excluded.version_formula, modelo_activo=excluded.modelo_activo,
+            dominio=excluded.dominio, fecha_calculo=excluded.fecha_calculo
     """, (candidato_id, demanda_proxy, tendencia_proxy, margen_factor, n_vecinos,
           score_final, clasificacion, vecinos_detalle, factor_mercado, filtro_aplicado,
           sim_ponderada, k_efectivo, f_soporte, f_tipo, f_color, f_atrib, f_demanda,
           f_rotacion, rotacion_proxy, f_venta, venta_proxy, f_descuento, descuento_proxy,
-          version_formula, almacen.ahora()))
+          version_formula, modelo_activo, dominio, almacen.ahora()))
 
 
 def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str = "estandar"):
@@ -3830,7 +3843,8 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
             tareas.append((candidato_id_t, indice_t, color_t, v_t, v_dino_t))
         for indice_t, color_t in sin_vector:
             _guardar_score_variante(candidato_id_t, indice_t, color_t, None,
-                                    "sin_vector", 0, None, None, None)
+                                    "sin_vector", 0, None, None, None,
+                                    modelo_activo=modelo_activo, dominio="marca")
 
     for candidato_id, indice_variante, color_variante, v, v_dino in tareas:
         cl = _cl()
@@ -3900,7 +3914,8 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
 
         if not mascara_comparable.any():
             _guardar_score_variante(candidato_id, indice_variante, color_variante, None,
-                                    "sin_comparables", 0, None, filtro_aplicado, None)
+                                    "sin_comparables", 0, None, filtro_aplicado, None,
+                                    modelo_activo=modelo_activo, dominio="marca")
             if indice_variante != 0:
                 continue
             cl.execute("""
@@ -3910,10 +3925,10 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
                      sim_ponderada, k_efectivo, f_soporte, f_tipo, f_color, f_atrib, f_demanda,
                      f_rotacion, f_venta, rotacion_proxy, venta_proxy,
                      f_descuento, descuento_proxy,
-                     version_formula, fecha_calculo)
+                     version_formula, modelo_activo, dominio, fecha_calculo)
                 VALUES (?, NULL, NULL, NULL, 0, NULL, 'sin_comparables', '[]', ?,
                         NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, 'marca', ?)
                 ON CONFLICT (candidato_id) DO UPDATE SET
                     demanda_proxy=NULL, tendencia_proxy=NULL, margen_factor=NULL, n_vecinos=0,
                     score_final=NULL, clasificacion='sin_comparables', vecinos_detalle='[]',
@@ -3922,8 +3937,9 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
                     f_color=NULL, f_atrib=NULL, f_demanda=NULL,
                     f_rotacion=NULL, f_venta=NULL, rotacion_proxy=NULL, venta_proxy=NULL,
                     f_descuento=NULL, descuento_proxy=NULL,
-                    version_formula=NULL, fecha_calculo=excluded.fecha_calculo
-            """, (candidato_id, filtro_aplicado, almacen.ahora()))
+                    version_formula=NULL, modelo_activo=excluded.modelo_activo,
+                    dominio=excluded.dominio, fecha_calculo=excluded.fecha_calculo
+            """, (candidato_id, filtro_aplicado, modelo_activo, almacen.ahora()))
             continue
 
         kk = min(k, int(mascara_comparable.sum()))
@@ -4034,7 +4050,7 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
 
         _guardar_score_variante(candidato_id, indice_variante, color_variante, score_final,
                                 clasificacion, kk, round(sim_pond, 4), filtro_aplicado,
-                                metodo_score)
+                                metodo_score, modelo_activo=modelo_activo, dominio="marca")
         if indice_variante != 0:
             continue  # `candidato_score` = la fila de la variante 0, como siempre
 
@@ -4053,7 +4069,8 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
             f_rotacion=round(f_rotacion, 4), rotacion_proxy=round(rotacion_proxy, 3),
             f_venta=round(f_venta, 4), venta_proxy=round(venta_proxy, 3),
             f_descuento=round(f_descuento, 4), descuento_proxy=round(descuento_proxy, 3),
-            version_formula="2026-09-21-marca-v3")
+            version_formula="2026-09-21-marca-v3",
+            modelo_activo=modelo_activo, dominio="marca")
 
 
 def puntuar_candidatos(cur, candidato_ids, k=7, modelo_activo: str = "estandar"):
@@ -4223,7 +4240,8 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
             # "sin_vector" para que la tarjeta pueda decir que falta
             # vectorizarlo.
             _guardar_score_variante(candidato_id_t, indice_t, color_t, None,
-                                    "sin_vector", 0, None, None, None)
+                                    "sin_vector", 0, None, None, None,
+                                    modelo_activo=modelo_activo, dominio="tuc")
 
     for candidato_id, indice_variante, color_variante, v, v_dino in tareas:
         # FASE 2: los atributos del CANDIDATO (tipo, género, conflicto, color)
@@ -4325,7 +4343,8 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
 
         if not mascara_comparable.any():
             _guardar_score_variante(candidato_id, indice_variante, color_variante, None,
-                                    "sin_comparables", 0, None, filtro_aplicado, None)
+                                    "sin_comparables", 0, None, filtro_aplicado, None,
+                                    modelo_activo=modelo_activo, dominio="tuc")
             if indice_variante != 0:
                 continue
             # FASE 2: mismo UPSERT, en el `lote.sqlite`. `'[]'::jsonb` pasa a
@@ -4339,10 +4358,10 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
                      sim_ponderada, k_efectivo, f_soporte, f_tipo, f_color, f_atrib, f_demanda,
                      f_rotacion, f_venta, rotacion_proxy, venta_proxy,
                      f_descuento, descuento_proxy,
-                     version_formula, fecha_calculo)
+                     version_formula, modelo_activo, dominio, fecha_calculo)
                 VALUES (?, NULL, NULL, NULL, 0, NULL, 'sin_comparables', '[]', ?,
                         NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, 'tuc', ?)
                 ON CONFLICT (candidato_id) DO UPDATE SET
                     demanda_proxy=NULL, tendencia_proxy=NULL, margen_factor=NULL, n_vecinos=0,
                     score_final=NULL, clasificacion='sin_comparables', vecinos_detalle='[]',
@@ -4351,8 +4370,9 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
                     f_color=NULL, f_atrib=NULL, f_demanda=NULL,
                     f_rotacion=NULL, f_venta=NULL, rotacion_proxy=NULL, venta_proxy=NULL,
                     f_descuento=NULL, descuento_proxy=NULL,
-                    version_formula=NULL, fecha_calculo=excluded.fecha_calculo
-            """, (candidato_id, filtro_aplicado, almacen.ahora()))
+                    version_formula=NULL, modelo_activo=excluded.modelo_activo,
+                    dominio=excluded.dominio, fecha_calculo=excluded.fecha_calculo
+            """, (candidato_id, filtro_aplicado, modelo_activo, almacen.ahora()))
             continue
 
         kk = min(k, int(mascara_comparable.sum()))
@@ -4518,7 +4538,7 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
 
         _guardar_score_variante(candidato_id, indice_variante, color_variante, score_final,
                                 clasificacion, kk, round(sim_pond, 4), filtro_aplicado,
-                                metodo_score)
+                                metodo_score, modelo_activo=modelo_activo, dominio="tuc")
         if indice_variante != 0:
             # `candidato_score` sigue siendo la fila de la VARIANTE 0 tal cual
             # se escribía antes (es la que lee el desglose «¿por qué?» y la
@@ -4537,8 +4557,8 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
                  sim_ponderada, k_efectivo, f_soporte, f_tipo, f_color, f_atrib, f_demanda,
                  f_rotacion, f_venta, rotacion_proxy, venta_proxy,
                  f_descuento, descuento_proxy,
-                 version_formula, fecha_calculo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 version_formula, modelo_activo, dominio, fecha_calculo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (candidato_id) DO UPDATE SET
                 demanda_proxy=excluded.demanda_proxy, tendencia_proxy=excluded.tendencia_proxy,
                 margen_factor=excluded.margen_factor, n_vecinos=excluded.n_vecinos,
@@ -4551,7 +4571,8 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
                 f_rotacion=excluded.f_rotacion, f_venta=excluded.f_venta,
                 rotacion_proxy=excluded.rotacion_proxy, venta_proxy=excluded.venta_proxy,
                 f_descuento=excluded.f_descuento, descuento_proxy=excluded.descuento_proxy,
-                version_formula=excluded.version_formula, fecha_calculo=excluded.fecha_calculo
+                version_formula=excluded.version_formula, modelo_activo=excluded.modelo_activo,
+                dominio=excluded.dominio, fecha_calculo=excluded.fecha_calculo
         """, (candidato_id, round(demanda_proxy, 3), round(tendencia_proxy, 3), round(margen_factor, 3),
               kk, score_final, clasificacion, json.dumps(vecinos_detalle, ensure_ascii=False),
               round(factor_mercado, 4), filtro_aplicado,
@@ -4559,7 +4580,7 @@ def _puntuar_candidatos_impl(cur, candidato_ids, k=7, modelo_activo: str = "esta
               round(f_color, 4), round(f_atrib, 4), round(f_demanda, 4),
               round(f_rotacion, 4), round(f_venta, 4), round(rotacion_proxy, 3), round(venta_proxy, 3),
               round(f_descuento, 4), round(descuento_proxy, 3),
-              "2026-09-21-v3", almacen.ahora()))
+              "2026-09-21-v3", modelo_activo, "tuc", almacen.ahora()))
 
 
 # ---------- promoción staging -> permanente (solo al cotizar) ----------
