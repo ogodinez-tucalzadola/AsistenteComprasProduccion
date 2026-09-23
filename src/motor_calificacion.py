@@ -77,9 +77,22 @@ PIPELINE_DIR = Path(r"C:\Users\Tucalzado\Proyectos\GestionTUC\pipeline")  # FASE
 sys.path.insert(0, str(PIPELINE_DIR))
 sys.path.insert(0, str(Path(r"C:\Users\Tucalzado\Proyectos\AnálisisMercado\scripts")))
 
-from ingestar_catalogo_tuc import paginas_desde_entrada, detectar_items, parsear_metadata  # noqa: E402
-from vectorizar_imagenes import Vectorizador, MODELOS_DISPONIBLES, extraer_color, _kmeans_simple  # noqa: E402
-from promover_embeddings_imagen import nombrar_color, _clasificar_centroide, UMBRAL_SECUNDARIO  # noqa: E402
+# Auditoría 2026-09-23 (CI, Fase A): estos 3 imports dependen de carpetas
+# HERMANAS a este repo (GestionTUC, AnálisisMercado) que no existen fuera de
+# esta máquina -- en cualquier otro entorno (CI, otra PC) el módulo entero
+# fallaba al importarse, incluso para correr los tests puros que no tocan
+# nada de esto. Se degradan a None en vez de reventar: cualquier función que
+# de verdad los necesite (OCR de catálogo, vectorización, color) sigue
+# fallando igual que antes si se la llama sin esas carpetas -- lo único que
+# cambia es que `import motor_calificacion` ya no revienta antes de eso.
+try:
+    from ingestar_catalogo_tuc import paginas_desde_entrada, detectar_items, parsear_metadata  # noqa: E402
+    from vectorizar_imagenes import Vectorizador, MODELOS_DISPONIBLES, extraer_color, _kmeans_simple  # noqa: E402
+    from promover_embeddings_imagen import nombrar_color, _clasificar_centroide, UMBRAL_SECUNDARIO  # noqa: E402
+except ModuleNotFoundError:
+    paginas_desde_entrada = detectar_items = parsear_metadata = None
+    Vectorizador = MODELOS_DISPONIBLES = extraer_color = _kmeans_simple = None
+    nombrar_color = _clasificar_centroide = UMBRAL_SECUNDARIO = None
 
 MODELO_SEGMENTADOR = "facebook/sam-vit-base"  # SAM (Meta) vía transformers, checkpoint vit_b
 # (~375MB). Se eligió el SAM de `transformers` (ya instalado, v5.13) en vez de los paquetes
