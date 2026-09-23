@@ -185,3 +185,76 @@ def test_fallo_a_mitad_del_recalculo_no_borra_los_scores_previos(lote, canal_esp
             pg.close()
     finally:
         mc.cerrar_lote()
+
+
+# Paso 2 del plan de paridad (2026-09-23): los dos tests de arriba solo
+# verifican "tiene algún score" y "la clasificación es una letra válida" --
+# eso no protege contra un cambio de fórmula que mueva el NÚMERO exacto sin
+# volverlo None ni cambiarle la letra. Estos valores son los reales,
+# volcados el 2026-09-23 contra los mismos 2 lotes de arriba, en los DOS
+# canales por igual (ninguno se congela sin el otro).
+SCORES_CONGELADOS = {
+    "marca-Prueba2": {
+        19: 86.3541, 20: 91.6801, 21: 104.9318, 22: 92.7194, 23: 93.4338,
+        24: 97.2776, 25: 81.5663, 26: 102.3066, 27: 82.0233, 28: 78.295,
+        29: 76.4718, 30: 89.2654, 31: 74.2148, 32: 65.3155, 33: 74.0709,
+        34: 70.3753, 35: 77.1266, 36: 64.4943,
+    },
+    "tuc-PackingList134": {
+        25: 171.8301, 26: 165.2895, 27: 167.3504, 28: 91.5069, 29: 120.7893,
+        30: 172.0963, 31: 208.6184, 32: 180.8528,
+    },
+}
+
+
+@pytest.mark.parametrize("lote, canal_esperado, modelo_activo", LOTES_PRUEBA)
+def test_score_final_no_se_mueve_de_lo_congelado(lote, canal_esperado, modelo_activo, request):
+    """Congela el NÚMERO exacto de `score_final` por candidato, en los dos
+    canales por igual -- complementa los 2 tests de arriba, que solo miran
+    "tiene score" y "la letra es válida", no si el número en sí cambió.
+
+    Si este test falla tras un cambio a la fórmula, NO es automáticamente
+    un bug: puede ser un cambio de fórmula intencional (ej. ajustar un
+    factor). En ese caso, se revuelca `SCORES_CONGELADOS` a mano con los
+    valores nuevos -- lo que este test no permite es que el número cambie
+    SIN que alguien lo note y lo confirme a propósito."""
+    if not (lote.exists() and _conexion_postgres_disponible()):
+        pytest.skip(f"requiere Postgres local + el lote {lote.name} en disco")
+
+    import psycopg2
+    import psycopg2.extras
+    import motor_calificacion as mc
+
+    id_caso = request.node.callspec.id
+    esperados = SCORES_CONGELADOS[id_caso]
+
+    mc.fijar_lote(lote)
+    try:
+        assert mc.canal_venta_lote() == canal_esperado
+
+        pg = psycopg2.connect(host="127.0.0.1", port=5432, dbname="tcmarcas",
+                               user="tcm_etl", password="tcmarcas2025!",
+                               options="-c search_path=staging,bronze,silver,gold,public")
+        cur = pg.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        try:
+            cl = mc._cl()
+            ids = [r[0] for r in cl.execute("SELECT candidato_id FROM candidato").fetchall()]
+            mc.puntuar_candidatos(cur, ids, modelo_activo=modelo_activo)
+
+            reales = {
+                r["candidato_id"]: r["score_final"]
+                for r in mc._cl().execute(
+                    "SELECT candidato_id, score_final FROM candidato_score").fetchall()
+            }
+            assert set(reales) == set(esperados), (
+                f"cambiaron los candidatos del lote {lote.name} -- "
+                f"actualizar SCORES_CONGELADOS antes de confiar en este test")
+            for candidato_id, score_esperado in esperados.items():
+                assert reales[candidato_id] == pytest.approx(score_esperado, abs=1e-4), (
+                    f"candidato {candidato_id} ({id_caso}): score_final cambió de "
+                    f"{score_esperado} a {reales[candidato_id]} -- si fue un cambio de "
+                    f"fórmula intencional, actualizar SCORES_CONGELADOS a mano")
+        finally:
+            pg.close()
+    finally:
+        mc.cerrar_lote()
