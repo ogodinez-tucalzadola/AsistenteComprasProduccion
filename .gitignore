@@ -33,3 +33,4 @@ AsistenteComprasLotes/
 
 # ── pytest ────────────────────────────────────────────────────────
 .pytest_cache/
+.coverage

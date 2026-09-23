@@ -1,0 +1,33 @@
+name: Tests
+
+# Plan de mejora, Fase A (2026-09-23): antes de esto, los 17 tests de
+# tests/ solo corrían si alguien se acordaba de ejecutarlos a mano -- nada
+# impedía un commit que los rompiera. Corre en cada push/PR a main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Correr tests con cobertura
+        run: |
+          python -m pytest tests --cov=src --cov-report=term-missing -v
+        # Las 2 pruebas de caracterización (test_caracterizacion_score.py)
+        # necesitan Postgres real + un lote.sqlite de prueba en disco -- se
+        # saltan solas acá (requiere_entorno_real), no fallan: ver el propio
+        # docstring del archivo.

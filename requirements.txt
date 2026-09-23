@@ -21,5 +21,18 @@ darkdetect==0.8.0
 extract-msg==0.56.1
 pymupdf==1.28.2
 
+# Modelos de visión (fondo, segmentación y vectorización: BiRefNet, SAM,
+# fashion_siglip, dino_v2/dinov2_ti) -- faltaban en este archivo (auditoría
+# 2026-09-23): motor_calificacion.py los importa (torch, transformers, SAM)
+# pero nunca estuvieron listados acá, así que este archivo por sí solo no
+# alcanzaba para reconstruir el entorno si Zawa/.venv se perdiera. Versiones
+# congeladas desde el entorno real (`pip list`, 2026-09-23).
+torch==2.13.0
+torchvision==0.28.0
+transformers==5.15.0
+timm==1.0.28
+open_clip_torch==3.3.0
+
 # Solo para tests (Etapa 4):
 pytest==9.1.1
+pytest-cov==7.1.0

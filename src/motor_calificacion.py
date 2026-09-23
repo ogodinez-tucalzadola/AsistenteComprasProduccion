@@ -2972,6 +2972,16 @@ def canal_venta_lote() -> str:
             f"no se pudo leer canal_venta de {salida} -- degradando a 'tuc' en silencio")
         return "tuc"
     valor = str(meta.get("canal_venta") or "").strip().lower()
+    if valor and valor not in CANALES_VENTA:
+        # Auditoría 2026-09-23: antes esto degradaba a "tuc" sin dejar rastro
+        # -- un lote de TC Marcas con el valor corrupto se calificaba contra
+        # el catálogo equivocado sin que nadie se enterara. Ojo: NO se loguea
+        # cuando `valor` está simplemente vacío (lote que aún no pasó por el
+        # paso 1) -- eso es normal, no un dato corrupto.
+        _logger().error(
+            f"canal_venta guardado en {salida} es inválido ({valor!r}, "
+            f"esperaba uno de {sorted(CANALES_VENTA)}) -- degradando a 'tuc'")
+        return "tuc"
     return valor if valor in CANALES_VENTA else "tuc"
 
 
