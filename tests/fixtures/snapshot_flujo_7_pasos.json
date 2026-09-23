@@ -1,0 +1,2313 @@
+[
+  {
+    "etiqueta": "carga_inicial",
+    "paso_flujo": 6,
+    "v_paso_num": "PASO 6 DE 7",
+    "v_paso_titulo": "Candidatos calificados",
+    "v_paso_guia": "Candidatos ya calificados, con su grado de compra y sus comparables.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": null,
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": true,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": 3,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": [
+      [
+        19,
+        "S",
+        "09-160906-1_2",
+        "Cachos",
+        86.3541
+      ],
+      [
+        20,
+        "S",
+        "09-160906-2_2",
+        "Cachos",
+        91.6801
+      ],
+      [
+        21,
+        "S",
+        "09-160908-1_2",
+        "Cachos",
+        104.9318
+      ],
+      [
+        22,
+        "S",
+        "09-160908-2_2",
+        "Cachos",
+        92.7194
+      ],
+      [
+        23,
+        "S",
+        "09-160910-1_2",
+        "Cachos",
+        93.4338
+      ],
+      [
+        24,
+        "S",
+        "09-160910-3_2",
+        "Cachos",
+        97.2776
+      ],
+      [
+        25,
+        "S",
+        "09-160913-2_2",
+        "Cachos",
+        81.5663
+      ],
+      [
+        26,
+        "S",
+        "09-160913-3_2",
+        "Cachos",
+        102.3066
+      ],
+      [
+        27,
+        "S",
+        "09-160913-4_2",
+        "Cachos",
+        82.0233
+      ],
+      [
+        28,
+        "S",
+        "09-160917-2_2",
+        "Cachos",
+        78.295
+      ],
+      [
+        29,
+        "A",
+        "09-160917-3_2",
+        "Cachos",
+        76.4718
+      ],
+      [
+        30,
+        "S",
+        "09-160917-4_2",
+        "Cachos",
+        89.2654
+      ],
+      [
+        31,
+        "A",
+        "09-160918-4_2",
+        "Cachos",
+        74.2148
+      ],
+      [
+        32,
+        "A",
+        "09-160920-2_2",
+        "Cachos",
+        65.3155
+      ],
+      [
+        33,
+        "A",
+        "09-160920-4_2",
+        "Cachos",
+        74.0709
+      ],
+      [
+        34,
+        "A",
+        "09-160928-1_2",
+        "Cachos",
+        70.3753
+      ],
+      [
+        35,
+        "A",
+        "09-730903-1_2",
+        "Cachos",
+        77.1266
+      ],
+      [
+        36,
+        "A",
+        "09-730903-2_2",
+        "Cachos",
+        64.4943
+      ]
+    ],
+    "subvista_candidatos": {
+      "candidatos_empaquetada": true,
+      "optimizador_empaquetada": false,
+      "hijos_vista_candidatos": 2,
+      "hijos_vista_optimizador": 6
+    },
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "atras_a_paso_5",
+    "paso_flujo": 5,
+    "v_paso_num": "PASO 5 DE 7",
+    "v_paso_titulo": "Vectorizar y comparar",
+    "v_paso_guia": "Elegí con qué método se vectoriza y tocá «Calcular y continuar»: se calculan los vectores de cada candidato y se comparan contra el catálogo. Puede tardar varios minutos.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "atras_a_paso_4",
+    "paso_flujo": 4,
+    "v_paso_num": "PASO 4 DE 7",
+    "v_paso_titulo": "Confirmar y enviar",
+    "v_paso_guia": "Este es el resultado del lote. Desde acá se exporta y se manda al Asistente de Compras.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": true,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": 1,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "atras_a_paso_3",
+    "paso_flujo": 3,
+    "v_paso_num": "PASO 3 DE 7",
+    "v_paso_titulo": "Limpiar y revisar",
+    "v_paso_guia": "Estas fotos ya se limpiaron antes. Decidí foto por foto: aprobar o descartar. Cuando termines, «Continuar».",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": true,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "atras_a_paso_1",
+    "paso_flujo": 1,
+    "v_paso_num": "PASO 1 DE 7",
+    "v_paso_titulo": "Elegir proveedor y origen",
+    "v_paso_guia": "Decime de quién es el catálogo y dónde están las fotos. Después tocá «Siguiente».",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": true,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "siguiente_desde_1_quedo_en_3",
+    "paso_flujo": 3,
+    "v_paso_num": "PASO 3 DE 7",
+    "v_paso_titulo": "Limpiar y revisar",
+    "v_paso_guia": "Estas fotos ya se limpiaron antes. Decidí foto por foto: aprobar o descartar. Cuando termines, «Continuar».",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": true,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "paso_4_confirmar_y_enviar",
+    "paso_flujo": 4,
+    "v_paso_num": "PASO 4 DE 7",
+    "v_paso_titulo": "Confirmar y enviar",
+    "v_paso_guia": "Este es el resultado del lote. Desde acá se exporta y se manda al Asistente de Compras.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": true,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": 1,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "paso_5_vectorizar",
+    "paso_flujo": 5,
+    "v_paso_num": "PASO 5 DE 7",
+    "v_paso_titulo": "Vectorizar y comparar",
+    "v_paso_guia": "Elegí con qué método se vectoriza y tocá «Calcular y continuar»: se calculan los vectores de cada candidato y se comparan contra el catálogo. Puede tardar varios minutos.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "paso_6_candidatos_calificados",
+    "paso_flujo": 6,
+    "v_paso_num": "PASO 6 DE 7",
+    "v_paso_titulo": "Candidatos calificados",
+    "v_paso_guia": "Candidatos ya calificados, con su grado de compra y sus comparables.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": true,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": 3,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": [
+      [
+        19,
+        "S",
+        "09-160906-1_2",
+        "Cachos",
+        86.3541
+      ],
+      [
+        20,
+        "S",
+        "09-160906-2_2",
+        "Cachos",
+        91.6801
+      ],
+      [
+        21,
+        "S",
+        "09-160908-1_2",
+        "Cachos",
+        104.9318
+      ],
+      [
+        22,
+        "S",
+        "09-160908-2_2",
+        "Cachos",
+        92.7194
+      ],
+      [
+        23,
+        "S",
+        "09-160910-1_2",
+        "Cachos",
+        93.4338
+      ],
+      [
+        24,
+        "S",
+        "09-160910-3_2",
+        "Cachos",
+        97.2776
+      ],
+      [
+        25,
+        "S",
+        "09-160913-2_2",
+        "Cachos",
+        81.5663
+      ],
+      [
+        26,
+        "S",
+        "09-160913-3_2",
+        "Cachos",
+        102.3066
+      ],
+      [
+        27,
+        "S",
+        "09-160913-4_2",
+        "Cachos",
+        82.0233
+      ],
+      [
+        28,
+        "S",
+        "09-160917-2_2",
+        "Cachos",
+        78.295
+      ],
+      [
+        29,
+        "A",
+        "09-160917-3_2",
+        "Cachos",
+        76.4718
+      ],
+      [
+        30,
+        "S",
+        "09-160917-4_2",
+        "Cachos",
+        89.2654
+      ],
+      [
+        31,
+        "A",
+        "09-160918-4_2",
+        "Cachos",
+        74.2148
+      ],
+      [
+        32,
+        "A",
+        "09-160920-2_2",
+        "Cachos",
+        65.3155
+      ],
+      [
+        33,
+        "A",
+        "09-160920-4_2",
+        "Cachos",
+        74.0709
+      ],
+      [
+        34,
+        "A",
+        "09-160928-1_2",
+        "Cachos",
+        70.3753
+      ],
+      [
+        35,
+        "A",
+        "09-730903-1_2",
+        "Cachos",
+        77.1266
+      ],
+      [
+        36,
+        "A",
+        "09-730903-2_2",
+        "Cachos",
+        64.4943
+      ]
+    ],
+    "subvista_candidatos": {
+      "candidatos_empaquetada": true,
+      "optimizador_empaquetada": false,
+      "hijos_vista_candidatos": 2,
+      "hijos_vista_optimizador": 6
+    },
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "paso_7_sugerido_de_compra",
+    "paso_flujo": 7,
+    "v_paso_num": "PASO 7 DE 7",
+    "v_paso_titulo": "Sugerido de compra",
+    "v_paso_guia": "Poné el PDV objetivo y generá el pedido sugerido: cuántos pares de cada referencia conviene comprar.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": true,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": 3,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": [
+      [
+        19,
+        "S",
+        "09-160906-1_2",
+        "Cachos",
+        86.3541
+      ],
+      [
+        20,
+        "S",
+        "09-160906-2_2",
+        "Cachos",
+        91.6801
+      ],
+      [
+        21,
+        "S",
+        "09-160908-1_2",
+        "Cachos",
+        104.9318
+      ],
+      [
+        22,
+        "S",
+        "09-160908-2_2",
+        "Cachos",
+        92.7194
+      ],
+      [
+        23,
+        "S",
+        "09-160910-1_2",
+        "Cachos",
+        93.4338
+      ],
+      [
+        24,
+        "S",
+        "09-160910-3_2",
+        "Cachos",
+        97.2776
+      ],
+      [
+        25,
+        "S",
+        "09-160913-2_2",
+        "Cachos",
+        81.5663
+      ],
+      [
+        26,
+        "S",
+        "09-160913-3_2",
+        "Cachos",
+        102.3066
+      ],
+      [
+        27,
+        "S",
+        "09-160913-4_2",
+        "Cachos",
+        82.0233
+      ],
+      [
+        28,
+        "S",
+        "09-160917-2_2",
+        "Cachos",
+        78.295
+      ],
+      [
+        29,
+        "A",
+        "09-160917-3_2",
+        "Cachos",
+        76.4718
+      ],
+      [
+        30,
+        "S",
+        "09-160917-4_2",
+        "Cachos",
+        89.2654
+      ],
+      [
+        31,
+        "A",
+        "09-160918-4_2",
+        "Cachos",
+        74.2148
+      ],
+      [
+        32,
+        "A",
+        "09-160920-2_2",
+        "Cachos",
+        65.3155
+      ],
+      [
+        33,
+        "A",
+        "09-160920-4_2",
+        "Cachos",
+        74.0709
+      ],
+      [
+        34,
+        "A",
+        "09-160928-1_2",
+        "Cachos",
+        70.3753
+      ],
+      [
+        35,
+        "A",
+        "09-730903-1_2",
+        "Cachos",
+        77.1266
+      ],
+      [
+        36,
+        "A",
+        "09-730903-2_2",
+        "Cachos",
+        64.4943
+      ]
+    ],
+    "subvista_candidatos": {
+      "candidatos_empaquetada": false,
+      "optimizador_empaquetada": true,
+      "hijos_vista_candidatos": 2,
+      "hijos_vista_optimizador": 6
+    },
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "atras_desde_7_a_candidatos",
+    "paso_flujo": 6,
+    "v_paso_num": "PASO 6 DE 7",
+    "v_paso_titulo": "Candidatos calificados",
+    "v_paso_guia": "Candidatos ya calificados, con su grado de compra y sus comparables.",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": true,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": 3,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": [
+      [
+        19,
+        "S",
+        "09-160906-1_2",
+        "Cachos",
+        86.3541
+      ],
+      [
+        20,
+        "S",
+        "09-160906-2_2",
+        "Cachos",
+        91.6801
+      ],
+      [
+        21,
+        "S",
+        "09-160908-1_2",
+        "Cachos",
+        104.9318
+      ],
+      [
+        22,
+        "S",
+        "09-160908-2_2",
+        "Cachos",
+        92.7194
+      ],
+      [
+        23,
+        "S",
+        "09-160910-1_2",
+        "Cachos",
+        93.4338
+      ],
+      [
+        24,
+        "S",
+        "09-160910-3_2",
+        "Cachos",
+        97.2776
+      ],
+      [
+        25,
+        "S",
+        "09-160913-2_2",
+        "Cachos",
+        81.5663
+      ],
+      [
+        26,
+        "S",
+        "09-160913-3_2",
+        "Cachos",
+        102.3066
+      ],
+      [
+        27,
+        "S",
+        "09-160913-4_2",
+        "Cachos",
+        82.0233
+      ],
+      [
+        28,
+        "S",
+        "09-160917-2_2",
+        "Cachos",
+        78.295
+      ],
+      [
+        29,
+        "A",
+        "09-160917-3_2",
+        "Cachos",
+        76.4718
+      ],
+      [
+        30,
+        "S",
+        "09-160917-4_2",
+        "Cachos",
+        89.2654
+      ],
+      [
+        31,
+        "A",
+        "09-160918-4_2",
+        "Cachos",
+        74.2148
+      ],
+      [
+        32,
+        "A",
+        "09-160920-2_2",
+        "Cachos",
+        65.3155
+      ],
+      [
+        33,
+        "A",
+        "09-160920-4_2",
+        "Cachos",
+        74.0709
+      ],
+      [
+        34,
+        "A",
+        "09-160928-1_2",
+        "Cachos",
+        70.3753
+      ],
+      [
+        35,
+        "A",
+        "09-730903-1_2",
+        "Cachos",
+        77.1266
+      ],
+      [
+        36,
+        "A",
+        "09-730903-2_2",
+        "Cachos",
+        64.4943
+      ]
+    ],
+    "subvista_candidatos": {
+      "candidatos_empaquetada": true,
+      "optimizador_empaquetada": false,
+      "hijos_vista_candidatos": 2,
+      "hijos_vista_optimizador": 6
+    },
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  },
+  {
+    "etiqueta": "paso_2_elegir_que_limpiar",
+    "paso_flujo": 2,
+    "v_paso_num": "PASO 2 DE 7",
+    "v_paso_titulo": "Elegir qué limpiar",
+    "v_paso_guia": "Estas son las fotos que salieron del catálogo. Hacé clic en las que no son calzado (logos, portadas) para dejarlas afuera. Después, «Continuar».",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": true,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": 3,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": false,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": [
+      [
+        19,
+        "S",
+        "09-160906-1_2",
+        "Cachos",
+        86.3541
+      ],
+      [
+        20,
+        "S",
+        "09-160906-2_2",
+        "Cachos",
+        91.6801
+      ],
+      [
+        21,
+        "S",
+        "09-160908-1_2",
+        "Cachos",
+        104.9318
+      ],
+      [
+        22,
+        "S",
+        "09-160908-2_2",
+        "Cachos",
+        92.7194
+      ],
+      [
+        23,
+        "S",
+        "09-160910-1_2",
+        "Cachos",
+        93.4338
+      ],
+      [
+        24,
+        "S",
+        "09-160910-3_2",
+        "Cachos",
+        97.2776
+      ],
+      [
+        25,
+        "S",
+        "09-160913-2_2",
+        "Cachos",
+        81.5663
+      ],
+      [
+        26,
+        "S",
+        "09-160913-3_2",
+        "Cachos",
+        102.3066
+      ],
+      [
+        27,
+        "S",
+        "09-160913-4_2",
+        "Cachos",
+        82.0233
+      ],
+      [
+        28,
+        "S",
+        "09-160917-2_2",
+        "Cachos",
+        78.295
+      ],
+      [
+        29,
+        "A",
+        "09-160917-3_2",
+        "Cachos",
+        76.4718
+      ],
+      [
+        30,
+        "S",
+        "09-160917-4_2",
+        "Cachos",
+        89.2654
+      ],
+      [
+        31,
+        "A",
+        "09-160918-4_2",
+        "Cachos",
+        74.2148
+      ],
+      [
+        32,
+        "A",
+        "09-160920-2_2",
+        "Cachos",
+        65.3155
+      ],
+      [
+        33,
+        "A",
+        "09-160920-4_2",
+        "Cachos",
+        74.0709
+      ],
+      [
+        34,
+        "A",
+        "09-160928-1_2",
+        "Cachos",
+        70.3753
+      ],
+      [
+        35,
+        "A",
+        "09-730903-1_2",
+        "Cachos",
+        77.1266
+      ],
+      [
+        36,
+        "A",
+        "09-730903-2_2",
+        "Cachos",
+        64.4943
+      ]
+    ],
+    "subvista_candidatos": {
+      "candidatos_empaquetada": true,
+      "optimizador_empaquetada": false,
+      "hijos_vista_candidatos": 2,
+      "hijos_vista_optimizador": 6
+    },
+    "hay_revision_frame": true,
+    "hijos_revision": 1,
+    "n_archivos_revision": 23
+  },
+  {
+    "etiqueta": "cancelar_paso_2_vuelve_al_1",
+    "paso_flujo": 1,
+    "v_paso_num": "PASO 1 DE 7",
+    "v_paso_titulo": "Elegir proveedor y origen",
+    "v_paso_guia": "Decime de quién es el catálogo y dónde están las fotos. Después tocá «Siguiente».",
+    "v_paso_actual": "",
+    "v_canal_venta": "marca",
+    "v_canal_estado": "Canal: TC Marcas (marca reconocida) — el catálogo se va a comparar y calificar contra lo vendido en ese canal.",
+    "v_proveedor": "Proveedor: Cachos",
+    "v_metodo_vector": "ti",
+    "v_carpeta_activa": "Carpeta activa: <LOTE>  ·  23 recorte(s) cargados",
+    "v_salida": "<LOTE>",
+    "canal_venta_lote": "marca",
+    "proveedor_id": 334,
+    "proveedor_nombre": "Cachos",
+    "retomando_lote": true,
+    "n_recortes": 23,
+    "recortes": [
+      [
+        "09-160906-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160906-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160908-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160910-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160913-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-3_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160917-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160918-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160918-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160919-2_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160919-4_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160920-2_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160920-4_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-160921-1_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160921-3_2_01.png",
+        "descartado"
+      ],
+      [
+        "09-160928-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-1_2_01.png",
+        "aprobado"
+      ],
+      [
+        "09-730903-2_2_01.png",
+        "aprobado"
+      ]
+    ],
+    "hay_candidatos_frame": false,
+    "hay_resumen_frame": false,
+    "hijos_pantalla_inicio": 1,
+    "hijos_cuerpo": 4,
+    "hijos_candidatos": null,
+    "hijos_resumen": null,
+    "empaquetado_pantalla_inicio": true,
+    "empaquetado_cuerpo": false,
+    "empaquetado_monitor": false,
+    "candidatos": null,
+    "subvista_candidatos": null,
+    "hay_revision_frame": false,
+    "hijos_revision": null,
+    "n_archivos_revision": 0
+  }
+]
