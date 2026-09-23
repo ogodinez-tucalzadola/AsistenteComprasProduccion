@@ -1039,6 +1039,18 @@ class HerramientaUnica(ctk.CTk):
         self.after(150, _forzar_icono)
         self.after(500, _forzar_icono)
 
+        # Pedido del usuario (2026-09-23): que la ventana principal se ponga
+        # AL FRENTE al abrir, y también al restaurarla desde la barra de
+        # tareas (ej. después de tenerla minimizada detrás de otro
+        # programa). Mismo patrón ya usado para las ventanas emergentes
+        # (`_traer_al_frente`, línea ~8308): un toggle de `-topmost` breve,
+        # porque en Windows `lift()`/`focus_force()` solos no alcanzan
+        # cuando el foco lo tiene otra ventana. `<Map>` es el evento que
+        # dispara Tk cuando la ventana pasa de minimizada/oculta a visible
+        # -- restaurarla desde la barra de tareas es exactamente eso.
+        self.after(750, lambda: _traer_al_frente(self))
+        self.bind("<Map>", lambda _e: _traer_al_frente(self))
+
         self._armar_estilo()
 
         self._q: queue.Queue = queue.Queue()
