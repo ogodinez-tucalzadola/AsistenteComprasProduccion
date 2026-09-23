@@ -949,6 +949,17 @@ def _centrar_en_ventana_principal(padre, ventana, ancho: int, alto: int) -> None
     y = min(max(y, vy), vy + vh - alto)
     ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
 
+    # Pedido del usuario (2026-09-23): las ventanas emergentes se veían con
+    # el ícono genérico de Tk/Python en vez de la pluma de la app -- ningún
+    # CTkToplevel llamaba a `iconbitmap` por su cuenta (solo la ventana
+    # principal lo hacía, en `HerramientaUnica.__init__`). Como TODOS los
+    # CTkToplevel del archivo pasan por esta función para centrarse, es el
+    # único lugar que hace falta tocar para cubrirlos a todos de una vez.
+    try:
+        ventana.iconbitmap(str(PROYECTO / "icono_app.ico"))
+    except tk.TclError:
+        pass  # sin ícono no rompe la ventana, solo se ve la genérica de Tk
+
 
 class HerramientaUnica(ctk.CTk):
     # ── carpeta del lote activo ──────────────────────────────────────────────
