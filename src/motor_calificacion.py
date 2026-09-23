@@ -3806,6 +3806,230 @@ def _guardar_score_candidato(cl, candidato_id, *, demanda_proxy, tendencia_proxy
           version_formula, modelo_activo, dominio, almacen.ahora()))
 
 
+def _puntuar_variante_marca(idx, *, v, v_dino, cat_c, gen_c, categoria_conflicto,
+                             modelo_activo: str, k: int,
+                             precio_candidato_fn, factor_mercado_fn):
+    """La matemática de puntuar UNA variante (un color) contra el índice de TC
+    Marcas: filtro género/tipo por palabras, similitud, umbral de
+    comparabilidad del dominio 'marca', respaldo por precio, los 8 factores
+    acotados y el score final.
+
+    Es la gemela de `_puntuar_variante_tuc` para el otro canal, y existe por la
+    misma razón: mientras el cálculo vivía dentro del bucle de
+    `_puntuar_candidatos_marca_impl`, la única forma de probarlo era con
+    Postgres y un lote real montados. Acá no se toca NINGUNA base -- recibe el
+    índice ya cargado (lo que devuelve `_indice_marca_para_score`) y los datos
+    del candidato, y devuelve un dict con todo lo que el llamador va a guardar,
+    así que se puede verificar con arreglos numpy inventados a mano.
+
+    Las dos lecturas que sí vienen de una base llegan como FUNCIONES sin
+    argumentos (`precio_candidato_fn`, `factor_mercado_fn`) y no como valores
+    ya calculados, por el mismo motivo que en el canal tuc: en el bucle
+    original esas consultas solo corren cuando el camino llega hasta ellas (el
+    respaldo por precio, solo si no hubo comparables visuales; el factor de
+    mercado, solo si los hubo). Pasarlas evaluadas cambiaría cuántas consultas
+    se disparan; pasarlas como función deja ese comportamiento idéntico.
+
+    Qué es propio de ESTE canal y no del otro: el filtro de tipo va por
+    palabras (`_palabras_tipo_marca`) sobre un texto concatenado, no por
+    igualdad de categoría; `f_color` queda NEUTRO siempre (no existe tabla de
+    prevalencia de color para las categorías de marca -- ver el docstring del
+    orquestador); `f_demanda` solo mide si al menos MIN_VECINOS_DEMANDA_MARCA
+    vecinos tienen venta propia (NaN no es cero); y rotación/venta/descuento
+    anclan a las constantes REFERENCIA_*_MARCA, no a las del catálogo genérico.
+
+    Cuando no hay comparables devuelve el dict con `clasificacion =
+    "sin_comparables"` y el resto en None -- el llamador decide qué escribir,
+    acá no se escribe nada."""
+    n = len(idx["referencias"])
+
+    # Filtro duro: género canónico y tipo por palabras. Mismo criterio de
+    # degradación que el canal genérico -- si el filtro queda vacío se
+    # afloja y `f_tipo` lo castiga, en vez de dejar el candidato sin score.
+    mascara = np.ones(n, dtype=bool)
+    usa_genero = False
+    if gen_c:
+        m_gen = mascara & (idx["generos"] == gen_c)
+        if m_gen.any():
+            mascara, usa_genero = m_gen, True
+
+    usa_tipo = False
+    palabras = _palabras_tipo_marca(cat_c)
+    if palabras:
+        m_tipo = mascara & np.array(
+            [any(p in t for p in palabras) for t in idx["tipos"]], dtype=bool)
+        if m_tipo.any():
+            mascara, usa_tipo = m_tipo, True
+
+    filtro_aplicado = ("categoria+genero" if (usa_tipo and usa_genero) else
+                        "solo_categoria" if usa_tipo else
+                        "solo_genero" if usa_genero else "ninguno")
+
+    if modelo_activo in MODELO_UNICO:
+        sims = idx["vectores"] @ v
+    else:
+        sims = ALPHA_FUSION_SIGLIP * (idx["vectores"] @ v)
+        if v_dino is not None:
+            sims = sims + (1 - ALPHA_FUSION_SIGLIP) * (idx["vectores_dino"] @ v_dino)
+    sims = np.where(mascara, sims, -np.inf)
+
+    metodo_score = "visual"
+    # Umbral del DOMINIO MARCA, no el de tuc: ver `UMBRAL_POR_MODELO_MARCA`.
+    umbral_dominio = umbral_comparable(modelo_activo, "marca")
+    mascara_comparable = mascara & (sims >= umbral_dominio)
+
+    if not mascara_comparable.any():
+        # Mismo respaldo por PRECIO que el canal genérico, con el precio
+        # de publicación del canal marca (`precio_pub_tec`).
+        precio_candidato = precio_candidato_fn()
+        if precio_candidato:
+            precios_validos = ~np.isnan(idx["precios"]) & mascara
+            if precios_validos.any():
+                dif_rel = np.abs(idx["precios"] - precio_candidato) / precio_candidato
+                mascara_precio = precios_validos & (dif_rel <= TOLERANCIA_PRECIO)
+                if mascara_precio.any():
+                    sims = np.where(mascara_precio, 1 - (dif_rel / TOLERANCIA_PRECIO), -np.inf)
+                    mascara_comparable = mascara_precio
+                    metodo_score = "precio"
+
+    if not mascara_comparable.any():
+        return {"clasificacion": "sin_comparables", "filtro_aplicado": filtro_aplicado,
+                "metodo_score": None, "n_vecinos": 0, "score_final": None,
+                "sim_ponderada": None, "vecinos_detalle": None}
+
+    kk = min(k, int(mascara_comparable.sum()))
+    sims = np.where(mascara_comparable, sims, -np.inf)
+    top = np.argsort(-sims, kind="stable")[:kk]
+    umbral_activo = umbral_dominio if metodo_score == "visual" else 0.0
+    pesos = np.clip(sims[top] - umbral_activo, 0, None)
+    pesos = pesos / pesos.sum() if pesos.sum() > 0 else np.ones(kk) / kk
+
+    sim_pond = float(np.sum(pesos * sims[top]))
+    if metodo_score == "visual":
+        # Ancla del DOMINIO MARCA, no la de tuc: ver `ANCLA_SIMILITUD_MARCA`.
+        umbral_sim = umbral_dominio
+        ancla_sim = ancla_similitud(modelo_activo, "marca")
+    else:
+        umbral_sim, ancla_sim = 0.0, 1.0
+    sim_norm = min(1.0, max(0.0, (sim_pond - umbral_sim) / (ancla_sim - umbral_sim)))
+    score_base = 100.0 * sim_norm
+
+    k_efectivo = float(1.0 / np.sum(pesos ** 2))
+    f_soporte = 0.70 + 0.30 * min(1.0, k_efectivo / K_SOPORTE_PLENO)
+
+    f_tipo = (1.00 if filtro_aplicado == "categoria+genero" else
+              0.92 if filtro_aplicado in ("solo_categoria", "solo_genero") else
+              0.85)
+    if categoria_conflicto:
+        f_tipo = min(f_tipo, 0.92)
+
+    # f_color: NEUTRO en este canal, a propósito -- ver el docstring. No
+    # hay tabla de prevalencia de color por categoría de marca; inventar un
+    # lift con la del catálogo genérico sería peor que no medirlo.
+    f_color = 1.00
+
+    f_atrib = 1.00
+    materiales_top = idx["materiales"][top]
+    con_material = materiales_top != None  # noqa: E711
+    if con_material.sum() >= 2:
+        peso_con_material = float(np.sum(pesos[con_material]))
+        if peso_con_material > 0:
+            valores_material = materiales_top[con_material]
+            homogeneidad = max(
+                float(np.sum(pesos[con_material][valores_material == val])) / peso_con_material
+                for val in set(valores_material)
+            )
+            f_atrib = min(1.05, max(0.95, 0.98 + 0.04 * homogeneidad))
+
+    # f_demanda: velocidad real del canal marca, ponderada SOLO entre los
+    # vecinos que tienen ventas propias registradas (el resto es producto
+    # de mercado que nunca compramos; NaN, no cero).
+    velocidades_top = idx["velocidades"][top]
+    tendencias_top = idx["tendencias"][top]
+    con_venta = ~np.isnan(velocidades_top)
+    demanda_proxy = tendencia_proxy = None
+    f_demanda = 1.00
+    if con_venta.sum() >= MIN_VECINOS_DEMANDA_MARCA:
+        peso_con_venta = float(np.sum(pesos[con_venta]))
+        if peso_con_venta > 0:
+            demanda_proxy = float(np.sum(pesos[con_venta] * velocidades_top[con_venta])
+                                   / peso_con_venta)
+            t_validas = tendencias_top[con_venta]
+            t_validas = np.where(np.isnan(t_validas), 1.0, t_validas)
+            tendencia_proxy = float(np.sum(pesos[con_venta] * t_validas) / peso_con_venta)
+            f_demanda = min(1.20, max(0.85, 0.85 + 0.35 * (demanda_proxy / REFERENCIA_DEMANDA_MARCA)))
+
+    # f_rotacion / f_descuento / f_venta: mismo pedido explícito del dueño
+    # que el canal genérico, y desde el plan de mejora 2026-09-22, con la
+    # MISMA fuente 100% Power BI que el canal genérico -- ver
+    # REFERENCIA_ROT30_MARCA/REFERENCIA_PCT_SIN_PROMO_MARCA/
+    # REFERENCIA_FACTOR_VENTA_MARCA. `pct_rotacion` y `pct_sobre_lista`
+    # salen de `silver.fct_tcm_rotacion`/`silver.fct_tcm_precio`
+    # (Catalogo=TCMARCAS de los mismos 2 reportes que TUCALZADO); ninguno
+    # depende ya de AsistenteComprasTEC ni del CSV del ERP.
+    rotacion_proxy = float(np.sum(pesos * idx["rot30"][top]))
+    descuento_proxy = float(np.sum(pesos * idx["pct_sin_promo"][top]))
+    venta_proxy = float(np.sum(pesos * idx["factor_venta"][top]))
+    f_rotacion = min(1.15, max(0.85, 0.85 + 0.30 * (rotacion_proxy / REFERENCIA_ROT30_MARCA)))
+    f_descuento = min(1.15, max(0.85, 0.85 + 0.30 * (descuento_proxy / REFERENCIA_PCT_SIN_PROMO_MARCA)))
+    f_venta = min(1.20, max(0.85, 0.85 + 0.35 * (venta_proxy / REFERENCIA_FACTOR_VENTA_MARCA)))
+
+    margen_factor = 1.0  # igual que el canal genérico: se recalcula al cotizar
+    factor_mercado = factor_mercado_fn()
+
+    score_final = round(score_base * f_soporte * f_tipo * f_color * f_atrib
+                         * f_demanda * f_rotacion * f_venta * f_descuento
+                         * margen_factor * factor_mercado, 4)
+    clasificacion = ("S" if score_final >= CORTES_CLASIFICACION["S"] else
+                      "A" if score_final >= CORTES_CLASIFICACION["A"] else
+                      "B" if score_final >= CORTES_CLASIFICACION["B"] else
+                      "C" if score_final >= CORTES_CLASIFICACION["C"] else "D")
+
+    # Los vecinos de este canal se identifican por marca+referencia del
+    # fabricante, no por `codigo_tuc` (no existe en dominio marca). La
+    # clave `codigo_tuc` va explícita en None para que los consumidores
+    # que la leen (`api_desglose_score`, `precio_venta_referencia`) vean
+    # "no hay" en vez de reventar con KeyError.
+    orden_peso = np.argsort(-pesos)
+    vecinos_detalle = [
+        {"codigo_tuc": None,
+         "dominio": "marca",
+         "marca": (str(idx["marcas"][top[j]]) if idx["marcas"][top[j]] else None),
+         "referencia": str(idx["referencias"][top[j]]),
+         "codigo_tc": (str(idx["codigos_tc"][top[j]]) if idx["codigos_tc"][top[j]] else None),
+         "similitud": round(float(sims[top[j]]), 4),
+         "peso": round(float(pesos[j]), 4),
+         "metodo": metodo_score}
+        for j in orden_peso
+    ]
+
+    return {
+        "score_final": score_final,
+        "clasificacion": clasificacion,
+        "n_vecinos": kk,
+        "sim_ponderada": sim_pond,
+        "k_efectivo": k_efectivo,
+        "f_soporte": f_soporte,
+        "f_tipo": f_tipo,
+        "f_color": f_color,
+        "f_atrib": f_atrib,
+        "f_demanda": f_demanda,
+        "f_rotacion": f_rotacion,
+        "rotacion_proxy": rotacion_proxy,
+        "f_venta": f_venta,
+        "venta_proxy": venta_proxy,
+        "f_descuento": f_descuento,
+        "descuento_proxy": descuento_proxy,
+        "factor_mercado": factor_mercado,
+        "filtro_aplicado": filtro_aplicado,
+        "vecinos_detalle": vecinos_detalle,
+        "demanda_proxy": demanda_proxy,
+        "tendencia_proxy": tendencia_proxy,
+        "margen_factor": margen_factor,
+        "metodo_score": metodo_score,
+    }
+
+
 def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str = "estandar"):
     """Puntaje del canal TC MARCAS: los mismos 8 factores que el canal
     genérico (`score_base · f_soporte · f_tipo · f_color · f_atrib · f_demanda
@@ -3851,11 +4075,20 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
                   en vez de tratar "sin registro de venta" como "vendió cero".
       margen_factor / factor_mercado  sin cambios (el mercado ya funciona para
                   marca vía `gold.vw_senal_marca`).
+
+    Esta función es el ORQUESTADOR del canal 'marca', igual que
+    `_puntuar_candidatos_impl` lo es del canal 'tuc': carga el índice
+    (`_indice_marca_para_score`), recorre candidatos y colores leyendo del
+    `lote.sqlite` lo propio de cada uno, delega el cálculo en
+    `_puntuar_variante_marca` (matemática pura, sin SQL) y guarda el resultado
+    con las mismas sentencias de siempre. Ese reparto es de FORMA, no de fondo:
+    el orden de las operaciones y las constantes son los mismos de antes,
+    porque el requisito del dueño ("el score no se mueve ni un decimal") vale
+    para los dos canales por igual.
     """
     idx = _indice_marca_para_score(cur, modelo_activo)
     if idx is None:
         return
-    n = len(idx["referencias"])
 
     # Un puntaje por COLOR, igual que en el canal genérico (ver
     # `variantes_a_calificar`): el bulto del proveedor tampoco se puede partir
@@ -3880,44 +4113,11 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
         cat_c, gen_c, categoria_conflicto = tuple(cl.fetchone())
         categoria_conflicto = almacen.booleano(categoria_conflicto)
 
-        # Filtro duro: género canónico y tipo por palabras. Mismo criterio de
-        # degradación que el canal genérico -- si el filtro queda vacío se
-        # afloja y `f_tipo` lo castiga, en vez de dejar el candidato sin score.
-        mascara = np.ones(n, dtype=bool)
-        usa_genero = False
-        if gen_c:
-            m_gen = mascara & (idx["generos"] == gen_c)
-            if m_gen.any():
-                mascara, usa_genero = m_gen, True
-
-        usa_tipo = False
-        palabras = _palabras_tipo_marca(cat_c)
-        if palabras:
-            m_tipo = mascara & np.array(
-                [any(p in t for p in palabras) for t in idx["tipos"]], dtype=bool)
-            if m_tipo.any():
-                mascara, usa_tipo = m_tipo, True
-
-        filtro_aplicado = ("categoria+genero" if (usa_tipo and usa_genero) else
-                            "solo_categoria" if usa_tipo else
-                            "solo_genero" if usa_genero else "ninguno")
-
-        if modelo_activo in MODELO_UNICO:
-            sims = idx["vectores"] @ v
-        else:
-            sims = ALPHA_FUSION_SIGLIP * (idx["vectores"] @ v)
-            if v_dino is not None:
-                sims = sims + (1 - ALPHA_FUSION_SIGLIP) * (idx["vectores_dino"] @ v_dino)
-        sims = np.where(mascara, sims, -np.inf)
-
-        metodo_score = "visual"
-        # Umbral del DOMINIO MARCA, no el de tuc: ver `UMBRAL_POR_MODELO_MARCA`.
-        umbral_dominio = umbral_comparable(modelo_activo, "marca")
-        mascara_comparable = mascara & (sims >= umbral_dominio)
-
-        if not mascara_comparable.any():
-            # Mismo respaldo por PRECIO que el canal genérico, con el precio
-            # de publicación del canal marca (`precio_pub_tec`).
+        # El cálculo en sí vive en `_puntuar_variante_marca` (sin SQL adentro):
+        # la lectura del costo que necesita el respaldo por precio se le pasa
+        # como función para que siga corriendo SOLO cuando el cálculo llega
+        # hasta ella, igual que cuando todo esto era un solo bloque.
+        def _precio_candidato():
             cl.execute("""
                 SELECT r.costo, r.moneda_costo FROM candidato c
                 JOIN candidato_raw r
@@ -3926,18 +4126,18 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
                 WHERE c.candidato_id = ?
             """, (candidato_id,))
             fila_costo = cl.fetchone()
-            precio_candidato = _precio_venta_estimado(*tuple(fila_costo)) if fila_costo else None
-            if precio_candidato:
-                precios_validos = ~np.isnan(idx["precios"]) & mascara
-                if precios_validos.any():
-                    dif_rel = np.abs(idx["precios"] - precio_candidato) / precio_candidato
-                    mascara_precio = precios_validos & (dif_rel <= TOLERANCIA_PRECIO)
-                    if mascara_precio.any():
-                        sims = np.where(mascara_precio, 1 - (dif_rel / TOLERANCIA_PRECIO), -np.inf)
-                        mascara_comparable = mascara_precio
-                        metodo_score = "precio"
+            return _precio_venta_estimado(*tuple(fila_costo)) if fila_costo else None
 
-        if not mascara_comparable.any():
+        res = _puntuar_variante_marca(
+            idx, v=v, v_dino=v_dino, cat_c=cat_c, gen_c=gen_c,
+            categoria_conflicto=categoria_conflicto,
+            modelo_activo=modelo_activo, k=k,
+            precio_candidato_fn=_precio_candidato,
+            factor_mercado_fn=lambda: _factor_mercado(cur, candidato_id),
+        )
+        filtro_aplicado = res["filtro_aplicado"]
+
+        if res["clasificacion"] == "sin_comparables":
             _guardar_score_variante(candidato_id, indice_variante, color_variante, None,
                                     "sin_comparables", 0, None, filtro_aplicado, None,
                                     modelo_activo=modelo_activo, dominio="marca")
@@ -3967,133 +4167,31 @@ def _puntuar_candidatos_marca_impl(cur, candidato_ids, k=7, modelo_activo: str =
             """, (candidato_id, filtro_aplicado, modelo_activo, almacen.ahora()))
             continue
 
-        kk = min(k, int(mascara_comparable.sum()))
-        sims = np.where(mascara_comparable, sims, -np.inf)
-        top = np.argsort(-sims, kind="stable")[:kk]
-        umbral_activo = umbral_dominio if metodo_score == "visual" else 0.0
-        pesos = np.clip(sims[top] - umbral_activo, 0, None)
-        pesos = pesos / pesos.sum() if pesos.sum() > 0 else np.ones(kk) / kk
-
-        sim_pond = float(np.sum(pesos * sims[top]))
-        if metodo_score == "visual":
-            # Ancla del DOMINIO MARCA, no la de tuc: ver `ANCLA_SIMILITUD_MARCA`.
-            umbral_sim = umbral_dominio
-            ancla_sim = ancla_similitud(modelo_activo, "marca")
-        else:
-            umbral_sim, ancla_sim = 0.0, 1.0
-        sim_norm = min(1.0, max(0.0, (sim_pond - umbral_sim) / (ancla_sim - umbral_sim)))
-        score_base = 100.0 * sim_norm
-
-        k_efectivo = float(1.0 / np.sum(pesos ** 2))
-        f_soporte = 0.70 + 0.30 * min(1.0, k_efectivo / K_SOPORTE_PLENO)
-
-        f_tipo = (1.00 if filtro_aplicado == "categoria+genero" else
-                  0.92 if filtro_aplicado in ("solo_categoria", "solo_genero") else
-                  0.85)
-        if categoria_conflicto:
-            f_tipo = min(f_tipo, 0.92)
-
-        # f_color: NEUTRO en este canal, a propósito -- ver el docstring. No
-        # hay tabla de prevalencia de color por categoría de marca; inventar un
-        # lift con la del catálogo genérico sería peor que no medirlo.
-        f_color = 1.00
-
-        f_atrib = 1.00
-        materiales_top = idx["materiales"][top]
-        con_material = materiales_top != None  # noqa: E711
-        if con_material.sum() >= 2:
-            peso_con_material = float(np.sum(pesos[con_material]))
-            if peso_con_material > 0:
-                valores_material = materiales_top[con_material]
-                homogeneidad = max(
-                    float(np.sum(pesos[con_material][valores_material == val])) / peso_con_material
-                    for val in set(valores_material)
-                )
-                f_atrib = min(1.05, max(0.95, 0.98 + 0.04 * homogeneidad))
-
-        # f_demanda: velocidad real del canal marca, ponderada SOLO entre los
-        # vecinos que tienen ventas propias registradas (el resto es producto
-        # de mercado que nunca compramos; NaN, no cero).
-        velocidades_top = idx["velocidades"][top]
-        tendencias_top = idx["tendencias"][top]
-        con_venta = ~np.isnan(velocidades_top)
-        demanda_proxy = tendencia_proxy = None
-        f_demanda = 1.00
-        if con_venta.sum() >= MIN_VECINOS_DEMANDA_MARCA:
-            peso_con_venta = float(np.sum(pesos[con_venta]))
-            if peso_con_venta > 0:
-                demanda_proxy = float(np.sum(pesos[con_venta] * velocidades_top[con_venta])
-                                       / peso_con_venta)
-                t_validas = tendencias_top[con_venta]
-                t_validas = np.where(np.isnan(t_validas), 1.0, t_validas)
-                tendencia_proxy = float(np.sum(pesos[con_venta] * t_validas) / peso_con_venta)
-                f_demanda = min(1.20, max(0.85, 0.85 + 0.35 * (demanda_proxy / REFERENCIA_DEMANDA_MARCA)))
-
-        # f_rotacion / f_descuento / f_venta: mismo pedido explícito del dueño
-        # que el canal genérico, y desde el plan de mejora 2026-09-22, con la
-        # MISMA fuente 100% Power BI que el canal genérico -- ver
-        # REFERENCIA_ROT30_MARCA/REFERENCIA_PCT_SIN_PROMO_MARCA/
-        # REFERENCIA_FACTOR_VENTA_MARCA. `pct_rotacion` y `pct_sobre_lista`
-        # salen de `silver.fct_tcm_rotacion`/`silver.fct_tcm_precio`
-        # (Catalogo=TCMARCAS de los mismos 2 reportes que TUCALZADO); ninguno
-        # depende ya de AsistenteComprasTEC ni del CSV del ERP.
-        rotacion_proxy = float(np.sum(pesos * idx["rot30"][top]))
-        descuento_proxy = float(np.sum(pesos * idx["pct_sin_promo"][top]))
-        venta_proxy = float(np.sum(pesos * idx["factor_venta"][top]))
-        f_rotacion = min(1.15, max(0.85, 0.85 + 0.30 * (rotacion_proxy / REFERENCIA_ROT30_MARCA)))
-        f_descuento = min(1.15, max(0.85, 0.85 + 0.30 * (descuento_proxy / REFERENCIA_PCT_SIN_PROMO_MARCA)))
-        f_venta = min(1.20, max(0.85, 0.85 + 0.35 * (venta_proxy / REFERENCIA_FACTOR_VENTA_MARCA)))
-
-        margen_factor = 1.0  # igual que el canal genérico: se recalcula al cotizar
-        factor_mercado = _factor_mercado(cur, candidato_id)
-
-        score_final = round(score_base * f_soporte * f_tipo * f_color * f_atrib
-                             * f_demanda * f_rotacion * f_venta * f_descuento
-                             * margen_factor * factor_mercado, 4)
-        clasificacion = ("S" if score_final >= CORTES_CLASIFICACION["S"] else
-                          "A" if score_final >= CORTES_CLASIFICACION["A"] else
-                          "B" if score_final >= CORTES_CLASIFICACION["B"] else
-                          "C" if score_final >= CORTES_CLASIFICACION["C"] else "D")
-
-        # Los vecinos de este canal se identifican por marca+referencia del
-        # fabricante, no por `codigo_tuc` (no existe en dominio marca). La
-        # clave `codigo_tuc` va explícita en None para que los consumidores
-        # que la leen (`api_desglose_score`, `precio_venta_referencia`) vean
-        # "no hay" en vez de reventar con KeyError.
-        orden_peso = np.argsort(-pesos)
-        vecinos_detalle = [
-            {"codigo_tuc": None,
-             "dominio": "marca",
-             "marca": (str(idx["marcas"][top[j]]) if idx["marcas"][top[j]] else None),
-             "referencia": str(idx["referencias"][top[j]]),
-             "codigo_tc": (str(idx["codigos_tc"][top[j]]) if idx["codigos_tc"][top[j]] else None),
-             "similitud": round(float(sims[top[j]]), 4),
-             "peso": round(float(pesos[j]), 4),
-             "metodo": metodo_score}
-            for j in orden_peso
-        ]
-
-        _guardar_score_variante(candidato_id, indice_variante, color_variante, score_final,
-                                clasificacion, kk, round(sim_pond, 4), filtro_aplicado,
-                                metodo_score, modelo_activo=modelo_activo, dominio="marca")
+        _guardar_score_variante(candidato_id, indice_variante, color_variante,
+                                res["score_final"], res["clasificacion"], res["n_vecinos"],
+                                round(res["sim_ponderada"], 4), filtro_aplicado,
+                                res["metodo_score"], modelo_activo=modelo_activo,
+                                dominio="marca")
         if indice_variante != 0:
             continue  # `candidato_score` = la fila de la variante 0, como siempre
 
+        demanda_proxy = res["demanda_proxy"]
+        tendencia_proxy = res["tendencia_proxy"]
         _guardar_score_candidato(
             cl, candidato_id,
             demanda_proxy=round(demanda_proxy, 3) if demanda_proxy is not None else None,
             tendencia_proxy=round(tendencia_proxy, 3) if tendencia_proxy is not None else None,
-            margen_factor=round(margen_factor, 3), n_vecinos=kk,
-            score_final=score_final, clasificacion=clasificacion,
-            vecinos_detalle=json.dumps(vecinos_detalle, ensure_ascii=False),
-            factor_mercado=round(factor_mercado, 4), filtro_aplicado=filtro_aplicado,
-            sim_ponderada=round(sim_pond, 4), k_efectivo=round(k_efectivo, 3),
-            f_soporte=round(f_soporte, 4), f_tipo=round(f_tipo, 4),
-            f_color=round(f_color, 4), f_atrib=round(f_atrib, 4),
-            f_demanda=round(f_demanda, 4),
-            f_rotacion=round(f_rotacion, 4), rotacion_proxy=round(rotacion_proxy, 3),
-            f_venta=round(f_venta, 4), venta_proxy=round(venta_proxy, 3),
-            f_descuento=round(f_descuento, 4), descuento_proxy=round(descuento_proxy, 3),
+            margen_factor=round(res["margen_factor"], 3), n_vecinos=res["n_vecinos"],
+            score_final=res["score_final"], clasificacion=res["clasificacion"],
+            vecinos_detalle=json.dumps(res["vecinos_detalle"], ensure_ascii=False),
+            factor_mercado=round(res["factor_mercado"], 4), filtro_aplicado=filtro_aplicado,
+            sim_ponderada=round(res["sim_ponderada"], 4), k_efectivo=round(res["k_efectivo"], 3),
+            f_soporte=round(res["f_soporte"], 4), f_tipo=round(res["f_tipo"], 4),
+            f_color=round(res["f_color"], 4), f_atrib=round(res["f_atrib"], 4),
+            f_demanda=round(res["f_demanda"], 4),
+            f_rotacion=round(res["f_rotacion"], 4), rotacion_proxy=round(res["rotacion_proxy"], 3),
+            f_venta=round(res["f_venta"], 4), venta_proxy=round(res["venta_proxy"], 3),
+            f_descuento=round(res["f_descuento"], 4), descuento_proxy=round(res["descuento_proxy"], 3),
             version_formula="2026-09-21-marca-v3",
             modelo_activo=modelo_activo, dominio="marca")
 
