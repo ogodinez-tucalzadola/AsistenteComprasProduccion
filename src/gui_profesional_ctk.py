@@ -63,6 +63,7 @@ if sys.stdout is None or sys.stderr is None:
         sys.stderr = _sumidero
 
 import contextlib
+import ctypes
 import json
 import logging
 import os
@@ -1051,16 +1052,19 @@ class HerramientaUnica(ctk.CTk):
         self.after(500, _forzar_icono)
 
         # Pedido del usuario (2026-09-23): que la ventana principal se ponga
-        # AL FRENTE al abrir, y también al restaurarla desde la barra de
-        # tareas (ej. después de tenerla minimizada detrás de otro
-        # programa). Mismo patrón ya usado para las ventanas emergentes
-        # (`_traer_al_frente`, línea ~8308): un toggle de `-topmost` breve,
-        # porque en Windows `lift()`/`focus_force()` solos no alcanzan
-        # cuando el foco lo tiene otra ventana. `<Map>` es el evento que
-        # dispara Tk cuando la ventana pasa de minimizada/oculta a visible
-        # -- restaurarla desde la barra de tareas es exactamente eso.
-        self.after(750, lambda: _traer_al_frente(self))
-        self.bind("<Map>", lambda _e: _traer_al_frente(self))
+        # AL FRENTE al abrir (con doble clic en el ícono del escritorio), y
+        # también al restaurarla desde la barra de tareas. El simple toggle
+        # de `-topmost` (`_traer_al_frente`, alcanza para las ventanas
+        # emergentes) NO alcanza acá: el arranque de esta ventana tarda lo
+        # suficiente (varias librerías pesadas) como para que Windows le
+        # retire a la app el permiso de auto-enfocarse que le da a un
+        # programa recién abierto -- ver `_forzar_foreground_windows` para
+        # el porqué exacto y la técnica real (Win32 `AttachThreadInput`).
+        # `<Map>` es el evento que dispara Tk cuando la ventana pasa de
+        # minimizada/oculta a visible -- restaurarla desde la barra de
+        # tareas es exactamente eso.
+        self.after(750, lambda: _forzar_foreground_windows(self))
+        self.bind("<Map>", lambda _e: _forzar_foreground_windows(self))
 
         self._armar_estilo()
 
@@ -8326,6 +8330,51 @@ def reloj(widget):
         except tk.TclError:
             # widget destruido antes de quitar el reloj de arena: no es un fallo.
             pass
+
+
+def _forzar_foreground_windows(ventana) -> None:
+    """Fuerza que `ventana` sea la ventana ACTIVA de Windows (no solo que
+    esté encima en el apilamiento) -- pedido del usuario (2026-09-23): al
+    abrir la app con doble clic en el ícono del escritorio, Claude Code (la
+    terminal donde se estaba trabajando) se quedaba al frente en vez de la
+    app recién abierta.
+
+    Causa real: Windows tiene un "seguro anti robo de foco" -- si un
+    programa tarda más de un instante en mostrar su ventana después de que
+    el usuario lo abre (acá: varios segundos, por las librerías pesadas que
+    importa este archivo), Windows le retira el permiso de auto-enfocarse
+    que normalmente le da a cualquier app recién abierta por el usuario. A
+    partir de ahí, ni `wm attributes -topmost` ni `focus_force()` (que es
+    justo el patrón que SÍ alcanza para las ventanas emergentes, porque esas
+    abren con la app ya en foco) logran traerla al frente -- Windows las
+    ignora en silencio, sin ningún error de Python.
+
+    El único camino confiable para esto es la técnica estándar de Win32:
+    "pedir prestado" el hilo de entrada de la ventana que sí tiene el foco
+    ahora mismo (`AttachThreadInput`), pedir el foreground con ese préstamo
+    activo, y devolverlo -- mientras los dos hilos están adjuntos, Windows sí
+    deja que el hilo de esta app llame a `SetForegroundWindow`, algo que le
+    negaría si lo pidiera por su cuenta. Si algo de esto falla (ej. otra
+    versión de Windows, permisos), se degrada al intento con `-topmost` de
+    siempre -- nunca revienta la app por esto."""
+    try:
+        hwnd = ventana.winfo_id()
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        hwnd_actual = user32.GetForegroundWindow()
+        hilo_actual = kernel32.GetCurrentThreadId()
+        hilo_frente = user32.GetWindowThreadProcessId(hwnd_actual, None)
+        user32.AttachThreadInput(hilo_frente, hilo_actual, True)
+        try:
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE -- por si estaba minimizada
+            user32.SetForegroundWindow(hwnd)
+        finally:
+            user32.AttachThreadInput(hilo_frente, hilo_actual, False)
+    except Exception:  # noqa: BLE001 -- si la API de Windows falla, se sigue
+        # con el intento -topmost de siempre; no hay forma de que esto
+        # tumbe la app por un problema de traerla al frente.
+        pass
+    _traer_al_frente(ventana)
 
 
 def _traer_al_frente(ventana) -> None:
