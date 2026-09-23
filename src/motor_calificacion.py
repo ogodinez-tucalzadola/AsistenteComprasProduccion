@@ -617,8 +617,12 @@ WEB_DIR = rutas_externas.GESTIONTUC_DATA  # FASE 1: era
 # servidor_pty.py (solo lo usaba el Handler HTTP, que no se copio).
 DATOS_COMPARTIDOS = rutas_externas.DATOS_COMPARTIDOS
 CARPETA_CROPS = "tuc_catalogo_staging"
-DB_PARAMS = dict(host="127.0.0.1", port=5432, dbname="tcmarcas",
-                  user="tcm_etl", password="tcmarcas2025!")
+# Host configurable por variable de entorno (2026-09-23: acceso desde una
+# segunda PC en la misma red). En esta máquina, sin la variable definida,
+# sigue siendo 127.0.0.1 -- comportamiento idéntico a siempre. En la PC2 se
+# define ASISTENTE_DB_HOST con la IP LAN de esta máquina.
+DB_PARAMS = dict(host=os.environ.get("ASISTENTE_DB_HOST", "127.0.0.1"), port=5432,
+                  dbname="tcmarcas", user="tcm_etl", password="tcmarcas2025!")
 MODELOS = ["fashion_siglip", "dino_v2"]
 MODELO_TI = ["dinov2_ti"]
 CONFIANZA_AUTO_APROBAR = 80
