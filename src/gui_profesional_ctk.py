@@ -3085,6 +3085,32 @@ class HerramientaUnica(ctk.CTk):
                                     padx=6, pady=(0, 6))
         self._candidatos_frame.mostrar_candidatos()
         self._actualizar_paso(6)
+        self._avisar_si_metricas_viejas()
+
+    def _avisar_si_metricas_viejas(self) -> None:
+        """Auditoría 2026-09-23 (M4): si el proceso que recalcula rotación/
+        venta/precio (`GestionTUC/_actualizar_metricas.bat`) se dejó de
+        correr, los scores de este lote se calculan en silencio contra datos
+        cada vez más viejos -- sin este aviso, nadie lo nota mirando la
+        pantalla. Una sola consulta por sesión (`avisar_si_metricas_viejas`
+        se auto-limita), en un hilo aparte para no trabar la pantalla de
+        candidatos con un viaje a Postgres."""
+        canal = self.canal_venta_lote()
+        if canal is None:
+            return
+
+        def _consultar() -> None:
+            try:
+                import motor_candidatos
+                mensaje = motor_candidatos.avisar_si_metricas_viejas(canal)
+            except Exception:  # noqa: BLE001 -- un aviso que falla no puede tumbar el paso 6
+                _logger_gui().exception("no se pudo verificar la frescura de las métricas")
+                return
+            if mensaje:
+                self.after(0, lambda: messagebox.showwarning("Datos de venta desactualizados",
+                                                              mensaje))
+
+        threading.Thread(target=_consultar, daemon=True).start()
 
     def _mostrar_sugerido_compra(self) -> None:
         """Paso 7 y último: el sugerido de compra (PDV objetivo → cuántos pares

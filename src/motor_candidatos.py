@@ -1397,3 +1397,59 @@ def listar_proveedores() -> list[tuple[int, str]]:
     filas = cur.fetchall()
     c.close()
     return filas
+
+
+# Auditoría 2026-09-23, Fase B (M4): las métricas de rotación/venta/precio
+# (`gold.agg_tuc_metricas` canal tuc, `gold.agg_tcm_metricas_prod` canal
+# marca) se recalculan por un proceso aparte (`_actualizar_metricas.bat` en
+# GestionTUC) que hasta ahora no tenía tarea programada -- si alguien se
+# olvida de correrlo, los scores del paso 6 se calculan en silencio contra
+# datos cada vez más viejos, sin que el comprador tenga forma de saberlo
+# mirando la pantalla. Umbral (20 días) fijado por decisión explícita del
+# dueño 2026-09-23, no una medición -- el pipeline real corre Lun/Mié/Vie,
+# así que 20 días es más del triple del ciclo esperado.
+DIAS_FRESCURA_METRICAS = 20
+
+_frescura_avisada_esta_sesion = False
+
+
+def verificar_frescura_metricas(canal_venta: str) -> str | None:
+    """None si las métricas del canal están frescas (o si no se pudo
+    verificar -- nunca bloquea al comprador por un problema de red/consulta).
+    Si están viejas, devuelve un mensaje listo para mostrar en pantalla."""
+    tabla = "gold.agg_tuc_metricas" if canal_venta == "tuc" else "gold.agg_tcm_metricas_prod"
+    try:
+        c = conectar()
+        try:
+            cur = c.cursor()
+            cur.execute(f"SELECT MAX(fecha_calculo) FROM {tabla}")
+            fila = cur.fetchone()
+        finally:
+            c.close()
+    except Exception:  # noqa: BLE001 -- no poder verificar no puede bloquear el flujo
+        _motor_calif_mod._logger().exception(
+            f"no se pudo verificar la frescura de {tabla}")
+        return None
+    ultima = fila[0] if fila else None
+    if ultima is None:
+        return None
+    hoy = date.today()
+    ultima_fecha = ultima.date() if hasattr(ultima, "date") else ultima
+    dias = (hoy - ultima_fecha).days
+    if dias <= DIAS_FRESCURA_METRICAS:
+        return None
+    return (f"Las métricas de este canal no se recalculan desde hace {dias} días "
+            f"({ultima_fecha:%d/%m/%Y}) -- más de lo esperado ({DIAS_FRESCURA_METRICAS} días). "
+            "Los scores de este lote pueden estar calculados contra datos de venta viejos. "
+            "Avisale a quien corre el proceso de actualización de métricas en GestionTUC.")
+
+
+def avisar_si_metricas_viejas(canal_venta: str) -> str | None:
+    """Como `verificar_frescura_metricas`, pero solo la PRIMERA vez en esta
+    corrida de la app -- una consulta a Postgres por sesión, no una por cada
+    vez que se abre el paso 6."""
+    global _frescura_avisada_esta_sesion
+    if _frescura_avisada_esta_sesion:
+        return None
+    _frescura_avisada_esta_sesion = True
+    return verificar_frescura_metricas(canal_venta)
