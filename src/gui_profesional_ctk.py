@@ -1063,8 +1063,18 @@ class HerramientaUnica(ctk.CTk):
         # `<Map>` es el evento que dispara Tk cuando la ventana pasa de
         # minimizada/oculta a visible -- restaurarla desde la barra de
         # tareas es exactamente eso.
+        #
+        # OJO con el filtro `evento.widget is self`: `<Map>` no es solo del
+        # root, lo dispara CADA widget hijo al hacerse visible y burbujea
+        # hasta acá. Sin el filtro esto corría cientos de veces durante el
+        # armado de la pantalla (medido el 2026-09-23: ~300 llamadas en 2
+        # segundos), peleando con customtkinter mientras rehace la ventana.
+        def _al_mapear(evento) -> None:
+            if evento.widget is self:
+                _forzar_foreground_windows(self, intentos=3)
+
         self.after(750, lambda: _forzar_foreground_windows(self))
-        self.bind("<Map>", lambda _e: _forzar_foreground_windows(self))
+        self.bind("<Map>", _al_mapear)
 
         self._armar_estilo()
 
@@ -8332,33 +8342,78 @@ def reloj(widget):
             pass
 
 
-def _forzar_foreground_windows(ventana) -> None:
+def _hwnd_real_windows(ventana) -> int:
+    """HWND de nivel Windows de `ventana` (el que maneja la barra de tareas).
+
+    Este es el bug concreto que hacía fallar los intentos anteriores, medido
+    el 2026-09-23: `winfo_id()` sobre la ventana principal NO devuelve ese
+    HWND, devuelve el de una ventana HIJA sin título que Tk/customtkinter
+    crean por dentro. En la medición, `winfo_id()` daba 13566620 (título
+    vacío) mientras el HWND real era 3145838 (título 'Asistente de
+    Compras'), y `SetForegroundWindow()` con el primero devolvió 0 (o sea,
+    falló) las ~300 veces que se lo llamó, sin lanzar ninguna excepción --
+    por eso el intento anterior parecía correcto y no hacía nada.
+    `GetAncestor(..., GA_ROOT)` es lo que sube del hijo al verdadero."""
+    hwnd = ventana.winfo_id()
+    try:
+        raiz = ctypes.windll.user32.GetAncestor(hwnd, 2)  # 2 = GA_ROOT
+    except Exception:  # noqa: BLE001 -- sin la API se sigue con el id crudo
+        return hwnd
+    return raiz or hwnd
+
+
+def _foreground_es_de_esta_app() -> bool:
+    """¿La ventana activa de Windows ya pertenece a ESTE proceso?
+
+    Es la condición de corte de los reintentos de `_forzar_foreground_windows`:
+    sin ella los reintentos le seguirían robando el foco al usuario si él se
+    cambió a propósito a otro programa mientras la app terminaba de abrir."""
+    try:
+        user32 = ctypes.windll.user32
+        pid = ctypes.c_ulong()
+        user32.GetWindowThreadProcessId(
+            user32.GetForegroundWindow(), ctypes.byref(pid)
+        )
+        return pid.value == os.getpid()
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _forzar_foreground_windows(ventana, intentos: int = 10) -> None:
     """Fuerza que `ventana` sea la ventana ACTIVA de Windows (no solo que
     esté encima en el apilamiento) -- pedido del usuario (2026-09-23): al
     abrir la app con doble clic en el ícono del escritorio, Claude Code (la
     terminal donde se estaba trabajando) se quedaba al frente en vez de la
     app recién abierta.
 
-    Causa real: Windows tiene un "seguro anti robo de foco" -- si un
-    programa tarda más de un instante en mostrar su ventana después de que
-    el usuario lo abre (acá: varios segundos, por las librerías pesadas que
-    importa este archivo), Windows le retira el permiso de auto-enfocarse
-    que normalmente le da a cualquier app recién abierta por el usuario. A
-    partir de ahí, ni `wm attributes -topmost` ni `focus_force()` (que es
-    justo el patrón que SÍ alcanza para las ventanas emergentes, porque esas
-    abren con la app ya en foco) logran traerla al frente -- Windows las
-    ignora en silencio, sin ningún error de Python.
+    Causa real, medida (no supuesta) el 2026-09-23 con
+    `GetForegroundWindow()` antes y después de abrir la app:
 
-    El único camino confiable para esto es la técnica estándar de Win32:
-    "pedir prestado" el hilo de entrada de la ventana que sí tiene el foco
-    ahora mismo (`AttachThreadInput`), pedir el foreground con ese préstamo
-    activo, y devolverlo -- mientras los dos hilos están adjuntos, Windows sí
-    deja que el hilo de esta app llame a `SetForegroundWindow`, algo que le
-    negaría si lo pidiera por su cuenta. Si algo de esto falla (ej. otra
-    versión de Windows, permisos), se degrada al intento con `-topmost` de
-    siempre -- nunca revienta la app por esto."""
+    1. La app SÍ nace al frente -- Windows se lo concede -- pero pierde el
+       foco sola ~0.8 s después, cuando termina de armarse (customtkinter
+       rehace la ventana para pintar la barra de título y la app se
+       maximiza), y el foreground vuelve al programa anterior. Medición sin
+       ninguna corrección activa: la app toma el frente en t+1.6 s y en
+       t+2.4 s el frente ya es de nuevo la ventana anterior. O sea: no hay
+       que "ganar" el foco al abrir, hay que RECUPERARLO después.
+    2. El intento anterior usaba `winfo_id()` como HWND, que es el de una
+       ventana hija -- ver `_hwnd_real_windows`. `SetForegroundWindow()`
+       devolvía 0 (falló) siempre, en silencio.
+
+    Por eso acá: HWND real vía `_hwnd_real_windows`, la técnica estándar de
+    Win32 de "pedir prestado" el hilo de entrada de la ventana que hoy tiene
+    el foco (`AttachThreadInput`) para que Windows acepte el pedido, y
+    REINTENTOS cada 300 ms -- un disparo único es una carrera contra ese
+    rearmado, y quién gana depende de lo rápida que esté la máquina, que es
+    justamente por qué antes "a veces" parecía andar. Los reintentos cortan
+    apenas el foreground ya es de este proceso, así que no le pelean el foco
+    al usuario si él se cambió a otro programa a propósito. Si la API de
+    Windows falla, se degrada al toggle de `-topmost` de siempre -- nunca
+    revienta la app por esto."""
+    if _foreground_es_de_esta_app():
+        return  # ya estamos al frente: no hay nada que forzar
     try:
-        hwnd = ventana.winfo_id()
+        hwnd = _hwnd_real_windows(ventana)
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
         hwnd_actual = user32.GetForegroundWindow()
@@ -8367,6 +8422,7 @@ def _forzar_foreground_windows(ventana) -> None:
         user32.AttachThreadInput(hilo_frente, hilo_actual, True)
         try:
             user32.ShowWindow(hwnd, 9)  # SW_RESTORE -- por si estaba minimizada
+            user32.BringWindowToTop(hwnd)
             user32.SetForegroundWindow(hwnd)
         finally:
             user32.AttachThreadInput(hilo_frente, hilo_actual, False)
@@ -8375,6 +8431,14 @@ def _forzar_foreground_windows(ventana) -> None:
         # tumbe la app por un problema de traerla al frente.
         pass
     _traer_al_frente(ventana)
+    if intentos > 0 and not _foreground_es_de_esta_app():
+        try:
+            ventana.after(
+                300, lambda: _forzar_foreground_windows(ventana, intentos - 1)
+            )
+        except tk.TclError:
+            # ventana cerrada mientras se reintentaba: no es un fallo.
+            pass
 
 
 def _traer_al_frente(ventana) -> None:
